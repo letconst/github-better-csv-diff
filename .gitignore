@@ -6,5 +6,6 @@
 
 .vscode/*
 .idea/*
+.playwright-cli/*
 
 .DS_Store
