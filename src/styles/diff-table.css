@@ -1,0 +1,63 @@
+/* Side-by-side CSV diff table styles */
+
+.csv-diff-container {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 20px;
+  border: 1px solid var(--borderColor-default, #d0d7de);
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.csv-diff-side {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.csv-diff-side table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.csv-diff-side th {
+  position: sticky;
+  top: 0;
+  background: var(--bgColor-muted, #f6f8fa);
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+  font-weight: 600;
+}
+
+.csv-diff-side td {
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--borderColor-muted, #eaeef2);
+  white-space: nowrap;
+}
+
+.csv-diff-row-added {
+  background: var(--diffBlob-addition-bgColor-line, #dafbe1);
+}
+
+.csv-diff-row-removed {
+  background: var(--diffBlob-deletion-bgColor-line, #ffebe9);
+}
+
+.csv-diff-cell-changed {
+  background: var(--diffBlob-addition-bgColor-word, #aceebb);
+}
+
+.csv-diff-cell-removed {
+  background: var(--diffBlob-deletion-bgColor-word, #ffcecb);
+}
+
+.csv-diff-header {
+  padding: 6px 10px;
+  font-weight: 600;
+  background: var(--bgColor-muted, #f6f8fa);
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+}

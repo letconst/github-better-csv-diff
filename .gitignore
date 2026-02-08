@@ -1,0 +1,8 @@
+/tmp
+/out-tsc
+/dist
+
+/node_modules
+
+.vscode/*
+.idea/*
