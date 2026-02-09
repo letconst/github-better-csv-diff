@@ -70,8 +70,9 @@ function processCsvDiffBlock(container: HTMLElement): void {
 
     const csvDiff = diffToCsv(diffLines);
     const tableElement = renderDiffTable(csvDiff);
-    injectTableOverlay(container, tableElement);
-    container.setAttribute(PROCESSED_ATTR, "true");
+    if (injectTableOverlay(container, tableElement)) {
+      container.setAttribute(PROCESSED_ATTR, "true");
+    }
   } catch (error) {
     console.error(
       "[GitHub Better CSV Diff] Error processing diff block:",
@@ -84,12 +85,12 @@ function processCsvDiffBlock(container: HTMLElement): void {
 function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement
-): void {
+): boolean {
   const header = container.children[0] as HTMLElement | undefined;
   const diffBody = container.children[1] as HTMLElement | undefined;
   if (!header || !diffBody) {
     console.warn("[GitHub Better CSV Diff] Could not find header/body in container");
-    return;
+    return false;
   }
 
   const wrapper = document.createElement("div");
@@ -121,6 +122,7 @@ function injectTableOverlay(
   // Show table view by default, hide raw diff
   container.insertBefore(wrapper, diffBody);
   diffBody.style.display = "none";
+  return true;
 }
 
 function debounce(fn: () => void, delayMs: number): MutationCallback {
