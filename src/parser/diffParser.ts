@@ -75,6 +75,18 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
   const rows = table.querySelectorAll<HTMLTableRowElement>("tr.diff-line-row");
   const result: DiffLine[] = [];
 
+  // Detect layout: find first non-hunk data row and check cell count
+  let isUnifiedLayout = false;
+  for (const row of rows) {
+    const cells = row.querySelectorAll<HTMLTableCellElement>("td");
+    if (cells.length === 0) continue;
+    if (cells[0].classList.contains("diff-hunk-cell")) continue;
+    isUnifiedLayout = cells.length === 3;
+    break;
+  }
+
+  const expectedCells = isUnifiedLayout ? 3 : 4;
+
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
@@ -84,9 +96,35 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
       continue;
     }
 
-    // Need at least 4 cells for split layout
-    if (cells.length < 4) continue;
+    if (cells.length < expectedCells) continue;
 
+    if (isUnifiedLayout) {
+      // Unified layout: cells[0]=old line num, cells[1]=new line num, cells[2]=content
+      const isContext = cells[0].classList.contains("diff-line-number-neutral");
+      const oldEmpty = cells[0].classList.contains("empty-diff-line");
+      const newEmpty = cells[1].classList.contains("empty-diff-line");
+
+      if (isContext) {
+        result.push({
+          type: "unchanged",
+          content: cells[2].textContent ?? "",
+        });
+      } else if (oldEmpty) {
+        result.push({
+          type: "added",
+          content: stripPrefix(cells[2].textContent ?? ""),
+        });
+      } else if (newEmpty) {
+        result.push({
+          type: "removed",
+          content: stripPrefix(cells[2].textContent ?? ""),
+        });
+      }
+      continue;
+    }
+
+    // Split layout: cells[0]=left num, cells[1]=left content,
+    //               cells[2]=right num, cells[3]=right content
     const leftEmpty = cells[0].classList.contains("empty-diff-line");
     const rightEmpty = cells[2].classList.contains("empty-diff-line");
     const isContext = cells[0].classList.contains("diff-line-number-neutral");
