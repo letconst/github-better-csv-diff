@@ -30,13 +30,20 @@
   padding: 4px 8px;
   text-align: left;
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+  border-right: 1px solid var(--borderColor-muted, #eaeef2);
   font-weight: 600;
 }
 
 .csv-diff-side td {
   padding: 2px 8px;
   border-bottom: 1px solid var(--borderColor-muted, #eaeef2);
+  border-right: 1px solid var(--borderColor-muted, #eaeef2);
   white-space: nowrap;
+}
+
+.csv-diff-side th:last-child,
+.csv-diff-side td:last-child {
+  border-right: none;
 }
 
 .csv-diff-row-added {
@@ -60,4 +67,29 @@
   font-weight: 600;
   background: var(--bgColor-muted, #f6f8fa);
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+}
+
+/* Toggle button */
+.csv-diff-toggle-btn {
+  margin-left: 8px;
+  cursor: pointer;
+}
+
+.csv-diff-toggle-active {
+  font-weight: 600;
+}
+
+/* Wrapper for the injected table */
+.csv-diff-wrapper {
+  padding: 8px;
+}
+
+/* Empty alignment row (placeholder when row exists only on one side) */
+.csv-diff-row-empty {
+  background: var(--bgColor-muted, #f6f8fa);
+}
+
+.csv-diff-row-empty td {
+  color: transparent;
+  user-select: none;
 }
