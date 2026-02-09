@@ -202,7 +202,7 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
           result.push({ before: null, after: after[j], type: "added" });
         }
       }
-      nextAfterFlush = ai + 1;
+      nextAfterFlush = Math.max(nextAfterFlush, ai + 1);
 
       const equal = arraysEqual(beforeRow, after[ai]);
       result.push({
