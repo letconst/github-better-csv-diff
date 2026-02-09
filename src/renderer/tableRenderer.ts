@@ -182,31 +182,44 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
   const beforeMap = new Map<string, string[]>();
   for (const row of before) beforeMap.set(row[0] ?? "", row);
 
-  const processedKeys = new Set<string>();
+  const afterIndex = new Map<string, number>();
+  for (let i = 0; i < after.length; i++) {
+    afterIndex.set(after[i][0] ?? "", i);
+  }
+
   const result: MatchedRow[] = [];
+  let nextAfterFlush = 0;
 
-  for (const afterRow of after) {
-    const key = afterRow[0] ?? "";
-    const beforeRow = beforeMap.get(key);
+  for (const beforeRow of before) {
+    const key = beforeRow[0] ?? "";
+    const ai = afterIndex.get(key);
 
-    if (beforeRow) {
-      processedKeys.add(key);
-      const equal = arraysEqual(beforeRow, afterRow);
+    if (ai !== undefined) {
+      // Flush after-only rows that precede this matched position
+      for (let j = nextAfterFlush; j < ai; j++) {
+        const afterKey = after[j][0] ?? "";
+        if (!beforeMap.has(afterKey)) {
+          result.push({ before: null, after: after[j], type: "added" });
+        }
+      }
+      nextAfterFlush = ai + 1;
+
+      const equal = arraysEqual(beforeRow, after[ai]);
       result.push({
         before: beforeRow,
-        after: afterRow,
+        after: after[ai],
         type: equal ? "unchanged" : "modified",
       });
     } else {
-      result.push({ before: null, after: afterRow, type: "added" });
+      result.push({ before: beforeRow, after: null, type: "removed" });
     }
   }
 
-  // Removed rows (in before but not in after)
-  for (const beforeRow of before) {
-    const key = beforeRow[0] ?? "";
-    if (!processedKeys.has(key)) {
-      result.push({ before: beforeRow, after: null, type: "removed" });
+  // Flush remaining after-only rows
+  for (let j = nextAfterFlush; j < after.length; j++) {
+    const afterKey = after[j][0] ?? "";
+    if (!beforeMap.has(afterKey)) {
+      result.push({ before: null, after: after[j], type: "added" });
     }
   }
 
