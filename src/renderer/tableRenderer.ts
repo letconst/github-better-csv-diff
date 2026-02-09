@@ -19,12 +19,21 @@ export function renderDiffTable(diff: CsvDiff): HTMLElement {
   const beforeData = diff.before.slice(1);
   const afterData = diff.after.slice(1);
 
+  const maxCols = Math.max(
+    beforeHeaders.length,
+    afterHeaders.length,
+    ...beforeData.map((row) => row.length),
+    ...afterData.map((row) => row.length)
+  );
+
   const matched = matchRows(beforeData, afterData);
 
   container.appendChild(
-    buildSide("Before", beforeHeaders, matched, "before")
+    buildSide("Before", beforeHeaders, matched, "before", maxCols)
   );
-  container.appendChild(buildSide("After", afterHeaders, matched, "after"));
+  container.appendChild(
+    buildSide("After", afterHeaders, matched, "after", maxCols)
+  );
 
   highlightChangedCells(container, matched);
 
@@ -50,7 +59,8 @@ function buildSide(
   label: string,
   headers: string[],
   matched: MatchedRow[],
-  side: "before" | "after"
+  side: "before" | "after",
+  maxCols: number
 ): HTMLElement {
   const sideDiv = document.createElement("div");
   sideDiv.className = "csv-diff-side";
@@ -64,16 +74,15 @@ function buildSide(
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
 
-  for (const col of headers) {
+  for (let i = 0; i < maxCols; i++) {
     const th = document.createElement("th");
-    th.textContent = col;
+    th.textContent = i < headers.length ? headers[i] : "";
     headerRow.appendChild(th);
   }
   thead.appendChild(headerRow);
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  const maxCols = headers.length;
 
   for (const match of matched) {
     const row = side === "before" ? match.before : match.after;
