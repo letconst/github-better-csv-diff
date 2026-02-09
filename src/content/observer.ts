@@ -45,7 +45,6 @@ function processExistingDiffs(): void {
     const table = container.querySelector('table[role="grid"]');
     if (!table) continue;
 
-    container.setAttribute(PROCESSED_ATTR, "true");
     processCsvDiffBlock(container);
   }
 }
@@ -72,6 +71,7 @@ function processCsvDiffBlock(container: HTMLElement): void {
     const csvDiff = diffToCsv(diffLines);
     const tableElement = renderDiffTable(csvDiff);
     injectTableOverlay(container, tableElement);
+    container.setAttribute(PROCESSED_ATTR, "true");
   } catch (error) {
     console.error(
       "[GitHub Better CSV Diff] Error processing diff block:",
