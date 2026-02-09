@@ -21,8 +21,8 @@ export function parseUnifiedDiff(diffText: string): DiffLine[] {
   for (const line of lines) {
     if (
       line.startsWith("@@") ||
-      line.startsWith("---") ||
-      line.startsWith("+++") ||
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ") ||
       line.startsWith("\\")
     ) {
       continue;
