@@ -120,6 +120,11 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
           type: "removed",
           content: stripPrefix(cells[2].textContent ?? ""),
         });
+      } else {
+        console.warn(
+          "[GitHub Better CSV Diff] Unhandled unified layout row",
+          cells[2].textContent
+        );
       }
       continue;
     }
