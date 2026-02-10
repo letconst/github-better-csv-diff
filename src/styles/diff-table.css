@@ -8,6 +8,7 @@
     "Liberation Mono", monospace;
   font-size: 12px;
   line-height: 20px;
+  color: var(--fgColor-default, #1f2328);
   border: 1px solid var(--borderColor-default, #d0d7de);
   border-radius: 6px;
   margin: 8px 0;
@@ -47,19 +48,23 @@
 }
 
 .csv-diff-row-added {
-  background: var(--diffBlob-addition-bgColor-line, #dafbe1);
+  background: var(--diffBlob-additionLine-bgColor, #dafbe1);
+  color: var(--diffBlob-additionLine-fgColor, #1f2328);
 }
 
 .csv-diff-row-removed {
-  background: var(--diffBlob-deletion-bgColor-line, #ffebe9);
+  background: var(--diffBlob-deletionLine-bgColor, #ffebe9);
+  color: var(--diffBlob-deletionLine-fgColor, #1f2328);
 }
 
 .csv-diff-cell-changed {
-  background: var(--diffBlob-addition-bgColor-word, #aceebb);
+  background: var(--diffBlob-additionLine-bgColor, #dafbe1);
+  color: var(--diffBlob-additionLine-fgColor, #1f2328);
 }
 
 .csv-diff-cell-removed {
-  background: var(--diffBlob-deletion-bgColor-word, #ffcecb);
+  background: var(--diffBlob-deletionLine-bgColor, #ffebe9);
+  color: var(--diffBlob-deletionLine-fgColor, #1f2328);
 }
 
 .csv-diff-header {
@@ -86,7 +91,7 @@
 
 /* Empty alignment row (placeholder when row exists only on one side) */
 .csv-diff-row-empty {
-  background: var(--bgColor-muted, #f6f8fa);
+  background: var(--diffBlob-emptyLine-bgColor, var(--bgColor-muted, #f6f8fa));
 }
 
 .csv-diff-row-empty td {
