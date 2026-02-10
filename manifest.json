@@ -5,7 +5,10 @@
   "description": "Renders CSV file diffs as side-by-side tables in GitHub PR file reviews",
   "content_scripts": [
     {
-      "matches": ["https://github.com/*/pull/*/changes*"],
+      "matches": [
+        "https://github.com/*/pull/*/changes*",
+        "https://github.com/*/pull/*/files*"
+      ],
       "js": ["src/content/index.ts"]
     }
   ],
