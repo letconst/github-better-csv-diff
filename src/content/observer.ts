@@ -38,7 +38,15 @@ function processExistingDiffs(): void {
   );
 
   for (const container of [...previewContainers, ...classicContainers]) {
-    if (container.hasAttribute(PROCESSED_ATTR)) continue;
+    if (container.hasAttribute(PROCESSED_ATTR)) {
+      // Wrapper still present — nothing to do
+      if (container.querySelector(".csv-diff-wrapper")) continue;
+
+      // Wrapper is gone (GitHub rebuilt diffBody on re-expand).
+      // Clean up stale elements; keep PROCESSED_ATTR so CSS hides raw diff.
+      container.removeAttribute("data-csv-diff-raw");
+      container.querySelector(".csv-diff-toggle-btn")?.remove();
+    }
 
     const isClassic = container.hasAttribute("data-tagsearch-path");
     const config = isClassic ? CLASSIC_UI : PREVIEW_UI;
@@ -115,6 +123,15 @@ function injectTableOverlay(
   wrapper.className = "csv-diff-wrapper";
   wrapper.appendChild(tableElement);
 
+  // Snapshot original children before prepending wrapper
+  const originalChildren = Array.from(diffBody.children) as HTMLElement[];
+
+  function setOriginalChildrenVisible(visible: boolean): void {
+    for (const child of originalChildren) {
+      child.style.display = visible ? "" : "none";
+    }
+  }
+
   const toggleBtn = document.createElement("button");
   toggleBtn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
   toggleBtn.textContent = "Raw Diff";
@@ -123,9 +140,11 @@ function injectTableOverlay(
   toggleBtn.addEventListener("click", () => {
     const isTableVisible = wrapper.style.display !== "none";
     wrapper.style.display = isTableVisible ? "none" : "";
-    diffBody.style.display = isTableVisible ? "" : "none";
+    setOriginalChildrenVisible(isTableVisible);
     toggleBtn.textContent = isTableVisible ? "Table View" : "Raw Diff";
     toggleBtn.classList.toggle("csv-diff-toggle-active", !isTableVisible);
+    // Toggle raw-mode attribute so CSS stops hiding original content
+    container.toggleAttribute("data-csv-diff-raw", isTableVisible);
   });
 
   const actionsArea = header.querySelector<HTMLElement>(config.actionsSelector);
@@ -135,9 +154,9 @@ function injectTableOverlay(
     header.appendChild(toggleBtn);
   }
 
-  // Show table view by default, hide raw diff
-  container.insertBefore(wrapper, diffBody);
-  diffBody.style.display = "none";
+  // Place wrapper inside diffBody so collapsing the file hides it too
+  setOriginalChildrenVisible(false);
+  diffBody.prepend(wrapper);
   return true;
 }
 
