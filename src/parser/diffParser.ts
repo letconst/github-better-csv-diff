@@ -75,14 +75,15 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
   const rows = table.querySelectorAll<HTMLTableRowElement>("tr.diff-line-row");
   const result: DiffLine[] = [];
 
-  // Detect layout: find first non-hunk data row and check cell count
+  // Detect layout: find first non-hunk row with a recognized cell count (3 or 4)
   let isUnifiedLayout = false;
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
     if (cells[0].classList.contains("diff-hunk-cell")) continue;
-    isUnifiedLayout = cells.length === 3;
-    break;
+    if (cells.length === 3) { isUnifiedLayout = true; break; }
+    if (cells.length === 4) { isUnifiedLayout = false; break; }
+    // Unexpected cell count — keep scanning
   }
 
   const expectedCells = isUnifiedLayout ? 3 : 4;
