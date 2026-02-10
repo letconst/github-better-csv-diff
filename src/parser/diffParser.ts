@@ -116,12 +116,12 @@ export function extractDiffLinesFromDom(
       } else if (oldEmpty) {
         result.push({
           type: "added",
-          content: stripPrefix(ui.extractContent(cells[2])),
+          content: ui.extractChangedContent(cells[2]),
         });
       } else if (newEmpty) {
         result.push({
           type: "removed",
-          content: stripPrefix(ui.extractContent(cells[2])),
+          content: ui.extractChangedContent(cells[2]),
         });
       } else {
         console.warn(
@@ -146,22 +146,22 @@ export function extractDiffLinesFromDom(
     } else if (leftEmpty) {
       result.push({
         type: "added",
-        content: stripPrefix(ui.extractContent(cells[3])),
+        content: ui.extractChangedContent(cells[3]),
       });
     } else if (rightEmpty) {
       result.push({
         type: "removed",
-        content: stripPrefix(ui.extractContent(cells[1])),
+        content: ui.extractChangedContent(cells[1]),
       });
     } else {
       // Modified line -- both sides present
       result.push({
         type: "removed",
-        content: stripPrefix(ui.extractContent(cells[1])),
+        content: ui.extractChangedContent(cells[1]),
       });
       result.push({
         type: "added",
-        content: stripPrefix(ui.extractContent(cells[3])),
+        content: ui.extractChangedContent(cells[3]),
       });
     }
   }
@@ -169,9 +169,3 @@ export function extractDiffLinesFromDom(
   return result;
 }
 
-function stripPrefix(text: string): string {
-  if (text.startsWith("+") || text.startsWith("-")) {
-    return text.slice(1);
-  }
-  return text;
-}

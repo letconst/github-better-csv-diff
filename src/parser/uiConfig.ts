@@ -16,6 +16,8 @@ export interface UiConfig {
   /** Selector for the header actions area where the toggle button is inserted. */
   actionsSelector: string;
   extractContent(cell: HTMLTableCellElement): string;
+  /** Extract text from a changed (added/removed) content cell, stripping diff marker if present. */
+  extractChangedContent(cell: HTMLTableCellElement): string;
 }
 
 export const PREVIEW_UI: UiConfig = {
@@ -29,6 +31,10 @@ export const PREVIEW_UI: UiConfig = {
   actionsSelector:
     '[class*="diffHeaderActionWrapper"], [class*="ActionGroup"]',
   extractContent: (cell) => cell.textContent ?? "",
+  extractChangedContent: (cell) => {
+    const text = cell.textContent ?? "";
+    return text.startsWith("+") || text.startsWith("-") ? text.slice(1) : text;
+  },
 };
 
 export const CLASSIC_UI: UiConfig = {
@@ -41,5 +47,7 @@ export const CLASSIC_UI: UiConfig = {
   contentSelector: ".js-file-content",
   actionsSelector: ".file-actions",
   extractContent: (cell) =>
+    cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
+  extractChangedContent: (cell) =>
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
 };
