@@ -47,6 +47,10 @@ npm run build    # production build
 
 Load `dist/` as an unpacked extension in `chrome://extensions` (developer mode).
 
+## Extension Testing
+
+To verify extension behavior in the browser, use `playwright-cli open --extension` to connect to the user's running browser with the extension installed.
+
 ## Key Decisions
 
 - DOM-based diff parsing (not GitHub REST API) to avoid authentication
