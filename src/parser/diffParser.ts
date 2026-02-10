@@ -3,6 +3,7 @@
  */
 
 import { parseCsv } from "./csvParser";
+import type { UiConfig } from "./uiConfig";
 
 export interface DiffLine {
   type: "added" | "removed" | "unchanged";
@@ -60,19 +61,21 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
 }
 
 /**
- * Extracts DiffLine[] directly from a GitHub diff container's DOM (Split Layout).
+ * Extracts DiffLine[] directly from a GitHub diff container's DOM.
+ * Supports both Preview UI and Classic UI via the UiConfig parameter.
  * This avoids reconstructing unified diff text by reading line types from CSS classes.
  */
-export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
-  const table = container.querySelector<HTMLTableElement>(
-    'table[role="grid"]'
-  );
+export function extractDiffLinesFromDom(
+  container: HTMLElement,
+  ui: UiConfig
+): DiffLine[] {
+  const table = container.querySelector<HTMLTableElement>(ui.tableSelector);
   if (!table) {
     console.warn("[GitHub Better CSV Diff] No diff table found in container");
     return [];
   }
 
-  const rows = table.querySelectorAll<HTMLTableRowElement>("tr.diff-line-row");
+  const rows = table.querySelectorAll<HTMLTableRowElement>(ui.rowSelector);
   const result: DiffLine[] = [];
 
   // Detect layout: find first non-hunk row with a recognized cell count (3 or 4)
@@ -80,7 +83,7 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
-    if (cells[0].classList.contains("diff-hunk-cell")) continue;
+    if (cells[0].classList.contains(ui.hunkClass)) continue;
     if (cells.length === 3) { isUnifiedLayout = true; break; }
     if (cells.length === 4) { isUnifiedLayout = false; break; }
     // Unexpected cell count — keep scanning
@@ -92,8 +95,8 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
 
-    // Hunk header (single cell spanning all columns)
-    if (cells[0].classList.contains("diff-hunk-cell")) {
+    // Hunk header
+    if (cells[0].classList.contains(ui.hunkClass)) {
       continue;
     }
 
@@ -101,29 +104,29 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
 
     if (isUnifiedLayout) {
       // Unified layout: cells[0]=old line num, cells[1]=new line num, cells[2]=content
-      const isContext = cells[0].classList.contains("diff-line-number-neutral");
-      const oldEmpty = cells[0].classList.contains("empty-diff-line");
-      const newEmpty = cells[1].classList.contains("empty-diff-line");
+      const isContext = cells[0].classList.contains(ui.contextClass);
+      const oldEmpty = cells[0].classList.contains(ui.emptyClass);
+      const newEmpty = cells[1].classList.contains(ui.emptyClass);
 
       if (isContext) {
         result.push({
           type: "unchanged",
-          content: cells[2].textContent ?? "",
+          content: ui.extractContent(cells[2]),
         });
       } else if (oldEmpty) {
         result.push({
           type: "added",
-          content: stripPrefix(cells[2].textContent ?? ""),
+          content: stripPrefix(ui.extractContent(cells[2])),
         });
       } else if (newEmpty) {
         result.push({
           type: "removed",
-          content: stripPrefix(cells[2].textContent ?? ""),
+          content: stripPrefix(ui.extractContent(cells[2])),
         });
       } else {
         console.warn(
           "[GitHub Better CSV Diff] Unhandled unified layout row",
-          cells[2].textContent
+          ui.extractContent(cells[2])
         );
       }
       continue;
@@ -131,34 +134,34 @@ export function extractDiffLinesFromDom(container: HTMLElement): DiffLine[] {
 
     // Split layout: cells[0]=left num, cells[1]=left content,
     //               cells[2]=right num, cells[3]=right content
-    const leftEmpty = cells[0].classList.contains("empty-diff-line");
-    const rightEmpty = cells[2].classList.contains("empty-diff-line");
-    const isContext = cells[0].classList.contains("diff-line-number-neutral");
+    const leftEmpty = cells[0].classList.contains(ui.emptyClass);
+    const rightEmpty = cells[2].classList.contains(ui.emptyClass);
+    const isContext = cells[0].classList.contains(ui.contextClass);
 
     if (isContext) {
       result.push({
         type: "unchanged",
-        content: cells[1].textContent ?? "",
+        content: ui.extractContent(cells[1]),
       });
     } else if (leftEmpty) {
       result.push({
         type: "added",
-        content: stripPrefix(cells[3].textContent ?? ""),
+        content: stripPrefix(ui.extractContent(cells[3])),
       });
     } else if (rightEmpty) {
       result.push({
         type: "removed",
-        content: stripPrefix(cells[1].textContent ?? ""),
+        content: stripPrefix(ui.extractContent(cells[1])),
       });
     } else {
       // Modified line -- both sides present
       result.push({
         type: "removed",
-        content: stripPrefix(cells[1].textContent ?? ""),
+        content: stripPrefix(ui.extractContent(cells[1])),
       });
       result.push({
         type: "added",
-        content: stripPrefix(cells[3].textContent ?? ""),
+        content: stripPrefix(ui.extractContent(cells[3])),
       });
     }
   }
