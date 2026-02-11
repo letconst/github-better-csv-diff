@@ -8,6 +8,9 @@ on:
 
 jobs:
   lint:
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -21,8 +24,9 @@ jobs:
 
       - run: npm run lint
 
-      - if: always() && github.event_name == 'pull_request'
+      - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         name: Collapse previous lint comments
+        continue-on-error: true
         run: |
           gh api graphql -f query='
             query($owner:String!,$repo:String!,$pr:Int!) {
@@ -52,8 +56,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
 
-      - if: failure() && github.event_name == 'pull_request'
+      - if: failure() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         name: Comment lint failure
+        continue-on-error: true
         run: |
           gh pr comment "$PR_NUMBER" --body "<!-- lint-result -->
           > [!WARNING]
