@@ -5,8 +5,8 @@
 import type { CsvDiff } from "../parser/diffParser";
 import {
   computeInlineDiff,
-  renderInlineBefore,
   renderInlineAfter,
+  renderInlineBefore,
 } from "./inlineDiff";
 
 export interface MatchedRow {
@@ -28,16 +28,16 @@ export function renderDiffTable(diff: CsvDiff): HTMLElement {
     beforeHeaders.length,
     afterHeaders.length,
     ...beforeData.map((row) => row.length),
-    ...afterData.map((row) => row.length)
+    ...afterData.map((row) => row.length),
   );
 
   const matched = matchRows(beforeData, afterData);
 
   container.appendChild(
-    buildSide("Before", beforeHeaders, matched, "before", maxCols)
+    buildSide("Before", beforeHeaders, matched, "before", maxCols),
   );
   container.appendChild(
-    buildSide("After", afterHeaders, matched, "after", maxCols)
+    buildSide("After", afterHeaders, matched, "after", maxCols),
   );
 
   highlightChangedCells(container, matched);
@@ -65,7 +65,7 @@ function buildSide(
   headers: string[],
   matched: MatchedRow[],
   side: "before" | "after",
-  maxCols: number
+  maxCols: number,
 ): HTMLElement {
   const sideDiv = document.createElement("div");
   sideDiv.className = "csv-diff-side";
@@ -122,7 +122,7 @@ function buildSide(
 
 function highlightChangedCells(
   container: HTMLElement,
-  matched: MatchedRow[]
+  matched: MatchedRow[],
 ): void {
   const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
   if (sides.length < 2) return;
@@ -149,7 +149,8 @@ function highlightChangedCells(
       if (beforeTd) beforeTd.classList.add("csv-diff-cell-removed");
       if (afterTd) afterTd.classList.add("csv-diff-cell-changed");
 
-      const changes = beforeTd && afterTd ? computeInlineDiff(beforeVal, afterVal) : null;
+      const changes =
+        beforeTd && afterTd ? computeInlineDiff(beforeVal, afterVal) : null;
       if (beforeTd && afterTd && changes) {
         beforeTd.textContent = "";
         beforeTd.appendChild(renderInlineBefore(changes));
@@ -162,10 +163,7 @@ function highlightChangedCells(
 
 // --- Row matching ---
 
-export function matchRows(
-  before: string[][],
-  after: string[][]
-): MatchedRow[] {
+export function matchRows(before: string[][], after: string[][]): MatchedRow[] {
   if (isFirstColumnKey(before, after)) {
     return matchByKey(before, after);
   }

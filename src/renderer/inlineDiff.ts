@@ -1,4 +1,4 @@
-import { diffWordsWithSpace, diffChars, type Change } from "diff";
+import { type Change, diffChars, diffWordsWithSpace } from "diff";
 
 const inlineDiffThreshold = 0.8;
 const charFallbackThreshold = 0.6;
@@ -6,7 +6,7 @@ const charFallbackThreshold = 0.6;
 function unchangedRatio(
   changes: Change[],
   before: string,
-  after: string
+  after: string,
 ): number {
   let unchangedChars = 0;
   for (const change of changes) {
@@ -27,7 +27,7 @@ function unchangedRatio(
  */
 export function computeInlineDiff(
   before: string,
-  after: string
+  after: string,
 ): Change[] | null {
   if (before === "" || after === "") return null;
 
