@@ -42,10 +42,9 @@ function processExistingDiffs(): void {
       // Wrapper still present — nothing to do
       if (container.querySelector(".csv-diff-wrapper")) continue;
 
-      // Wrapper is gone (GitHub rebuilt diffBody on re-expand).
-      // Clean up stale elements; keep PROCESSED_ATTR so CSS hides raw diff.
+      // Wrapper is gone (GitHub rebuilt diffBody on collapse/re-expand).
+      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand.
       container.removeAttribute("data-csv-diff-raw");
-      container.querySelector(".csv-diff-toggle-btn")?.remove();
     }
 
     const isClassic = container.hasAttribute("data-tagsearch-path");
@@ -63,8 +62,16 @@ function processExistingDiffs(): void {
 
     // Check if diff table is present (not collapsed)
     const table = container.querySelector(config.tableSelector);
-    if (!table) continue;
+    if (!table) {
+      // Collapsed: if previously processed, keep a toggle button in the header
+      if (container.hasAttribute(PROCESSED_ATTR)) {
+        ensurePlaceholderToggle(container, config);
+      }
+      continue;
+    }
 
+    // Remove stale toggle button before (re-)processing
+    container.querySelector(".csv-diff-toggle-btn")?.remove();
     processCsvDiffBlock(container, config, filename);
   }
 }
@@ -103,6 +110,42 @@ function processCsvDiffBlock(
       filename,
       error
     );
+  }
+}
+
+/** Find the actions area in the header, with fallback for Preview UI. */
+function findActionsArea(
+  header: HTMLElement,
+  config: UiConfig
+): HTMLElement | null {
+  const area = header.querySelector<HTMLElement>(config.actionsSelector);
+  if (area) return area;
+
+  // Fallback: locate via the "Viewed" button (aria-pressed attribute)
+  const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
+  return viewedBtn?.parentElement ?? null;
+}
+
+/** Insert a toggle button into the header (used as placeholder when file is collapsed). */
+function ensurePlaceholderToggle(
+  container: HTMLElement,
+  config: UiConfig
+): void {
+  if (container.querySelector(".csv-diff-toggle-btn")) return;
+
+  const header = container.querySelector<HTMLElement>(config.headerSelector);
+  if (!header) return;
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
+  toggleBtn.textContent = "Raw Diff";
+  toggleBtn.type = "button";
+
+  const actionsArea = findActionsArea(header, config);
+  if (actionsArea) {
+    actionsArea.prepend(toggleBtn);
+  } else {
+    header.appendChild(toggleBtn);
   }
 }
 
@@ -147,16 +190,7 @@ function injectTableOverlay(
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
   });
 
-  let actionsArea = header.querySelector<HTMLElement>(config.actionsSelector);
-
-  // Fallback: locate actions area via the "Viewed" button (aria-pressed attribute)
-  if (!actionsArea) {
-    const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
-    if (viewedBtn?.parentElement) {
-      actionsArea = viewedBtn.parentElement;
-    }
-  }
-
+  const actionsArea = findActionsArea(header, config);
   if (actionsArea) {
     actionsArea.prepend(toggleBtn);
   } else {
