@@ -89,6 +89,12 @@
   padding: 8px;
 }
 
+/* Prevent raw diff flash when Preview UI rebuilds DOM on re-expand.
+   Hides non-wrapper children immediately via CSS, before JS re-processes. */
+[data-csv-diff-processed][role="region"]:not([data-csv-diff-raw]) > :nth-child(2) > :not(.csv-diff-wrapper) {
+  display: none;
+}
+
 /* Empty alignment row (placeholder when row exists only on one side) */
 .csv-diff-row-empty {
   background: var(--diffBlob-emptyLine-bgColor, var(--bgColor-muted, #f6f8fa));
