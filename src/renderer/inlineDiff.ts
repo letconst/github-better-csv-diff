@@ -1,10 +1,10 @@
 import { diffWordsWithSpace } from "diff";
 
-const inlineDiffThreshold = 0.85;
+const inlineDiffThreshold = 0.8;
 
 /**
  * Determines whether inline highlighting should be applied.
- * Returns false if either value is empty or if >85% of content changed.
+ * Returns false if either value is empty or if >80% of content changed.
  */
 export function shouldInlineHighlight(
   before: string,
@@ -14,16 +14,15 @@ export function shouldInlineHighlight(
 
   const changes = diffWordsWithSpace(before, after);
 
-  let changedChars = 0;
-  let totalChars = 0;
+  let unchangedChars = 0;
   for (const change of changes) {
-    totalChars += change.value.length;
-    if (change.added || change.removed) {
-      changedChars += change.value.length;
+    if (!change.added && !change.removed) {
+      unchangedChars += change.value.length;
     }
   }
 
-  return changedChars / totalChars <= inlineDiffThreshold;
+  const maxLen = Math.max(before.length, after.length);
+  return unchangedChars / maxLen >= 1 - inlineDiffThreshold;
 }
 
 /**
