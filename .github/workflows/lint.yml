@@ -19,7 +19,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npx biome check src/
+      - run: npm run lint
 
       - if: always() && github.event_name == 'pull_request'
         name: Collapse previous lint comments
