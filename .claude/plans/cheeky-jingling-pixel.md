@@ -6,63 +6,59 @@ Currently, when a CSV cell is partially modified, the entire cell gets a backgro
 
 ## Approach
 
-Use the `diff` npm package (`diffWordsWithSpace`) to compute word-level diffs between before/after cell values. Render changed segments as `<span>` elements with GitHub's `--diffBlob-additionWord-bgColor` / `--diffBlob-deletionWord-bgColor` CSS variables. Cell-level background remains as-is; inline spans layer on top.
+Use the `diff` npm package to compute diffs between before/after cell values. Try `diffWordsWithSpace` first for natural word-boundary diffs; fall back to `diffChars` for single-token values (IDs, emails, codes without spaces). Render changed segments as `<span>` elements with GitHub's `--diffBlob-additionWord-bgColor` / `--diffBlob-deletionWord-bgColor` CSS variables. Cell-level background remains as-is; inline spans layer on top.
 
-## Files to Modify
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `package.json` | Add `diff` + `@types/diff` |
+| `package.json` | Add `diff` (v8+ has built-in types, no `@types/diff` needed) |
 | `src/renderer/inlineDiff.ts` | **New** — inline diff computation & DOM fragment building |
-| `src/renderer/tableRenderer.ts` | Extend `highlightChangedCells()` (line 141) to call inline diff |
+| `src/renderer/tableRenderer.ts` | Extend `highlightChangedCells()` to call inline diff |
 | `src/styles/diff-table.css` | Add `.csv-diff-inline-added` / `.csv-diff-inline-removed` classes |
 
-## Step-by-step
+## Design
 
-### 1. Install `diff` package
+### `src/renderer/inlineDiff.ts`
 
-```bash
-npm install diff
-npm install --save-dev @types/diff
-```
-
-### 2. Create `src/renderer/inlineDiff.ts`
+Two thresholds:
+- `inlineDiffThreshold = 0.8` — word-level: require ≥20% unchanged chars relative to max string length
+- `charFallbackThreshold = 0.6` — char-level fallback: require ≥60% unchanged chars (stricter, to avoid noisy highlights on short/dissimilar values like `12` → `23`)
 
 Three exported functions:
 
 ```typescript
-import { diffWordsWithSpace } from "diff";
+import { diffWordsWithSpace, diffChars, type Change } from "diff";
 
-const INLINE_DIFF_THRESHOLD = 0.8;
+/** Compute diff with word→char fallback. Returns null if thresholds not met. */
+export function computeInlineDiff(before: string, after: string): Change[] | null;
 
-/** Skip inline highlighting when >80% changed or either side is empty */
-export function shouldInlineHighlight(before: string, after: string): boolean;
+/** Build DocumentFragment for "before" cell from pre-computed changes */
+export function renderInlineBefore(changes: Change[]): DocumentFragment;
 
-/** Build DocumentFragment for "before" cell: removed segments wrapped in <span class="csv-diff-inline-removed"> */
-export function renderInlineBefore(before: string, after: string): DocumentFragment;
-
-/** Build DocumentFragment for "after" cell: added segments wrapped in <span class="csv-diff-inline-added"> */
-export function renderInlineAfter(before: string, after: string): DocumentFragment;
+/** Build DocumentFragment for "after" cell from pre-computed changes */
+export function renderInlineAfter(changes: Change[]): DocumentFragment;
 ```
 
-- `shouldInlineHighlight`: returns `false` if either value is empty, or if changed chars / total chars > 0.8
-- `renderInlineBefore`: iterates `Change[]`, skips `added`, wraps `removed` in `<span>`, leaves unchanged as text nodes
-- `renderInlineAfter`: iterates `Change[]`, skips `removed`, wraps `added` in `<span>`, leaves unchanged as text nodes
+- `computeInlineDiff`: returns `null` if either value is empty, or if both word-level and char-level diffs exceed their respective thresholds. Diff is computed once and reused by render functions.
+- `renderInlineBefore`: iterates `Change[]`, skips `added`, wraps `removed` in `<span class="csv-diff-inline-removed">`, leaves unchanged as text nodes
+- `renderInlineAfter`: iterates `Change[]`, skips `removed`, wraps `added` in `<span class="csv-diff-inline-added">`, leaves unchanged as text nodes
 
-### 3. Modify `highlightChangedCells()` in `tableRenderer.ts`
+### `highlightChangedCells()` in `tableRenderer.ts`
 
-At line 141 (`if (bVal !== aVal)` block), after adding cell-level classes, add:
+After adding cell-level classes, computes inline diff and renders if non-null:
 
 ```typescript
-if (bTd && aTd && shouldInlineHighlight(bVal, aVal)) {
-  bTd.textContent = "";
-  bTd.appendChild(renderInlineBefore(bVal, aVal));
-  aTd.textContent = "";
-  aTd.appendChild(renderInlineAfter(bVal, aVal));
+const changes = beforeTd && afterTd ? computeInlineDiff(beforeVal, afterVal) : null;
+if (beforeTd && afterTd && changes) {
+  beforeTd.textContent = "";
+  beforeTd.appendChild(renderInlineBefore(changes));
+  afterTd.textContent = "";
+  afterTd.appendChild(renderInlineAfter(changes));
 }
 ```
 
-### 4. Add CSS (after `.csv-diff-cell-removed` block, ~line 68)
+### CSS
 
 ```css
 .csv-diff-inline-added {
@@ -81,7 +77,9 @@ if (bTd && aTd && shouldInlineHighlight(bVal, aVal)) {
 ## Edge Cases
 
 - **Empty before/after**: skip inline, cell-level highlight only
-- **>80% changed**: skip inline, cell-level highlight only (too noisy)
+- **Word-level >80% changed**: falls back to char-level diff
+- **Char-level <60% unchanged**: skip inline, cell-level highlight only (avoids noisy highlights on short/dissimilar values)
+- **Single-token values** (e.g. `user123` → `user124`): char-level fallback catches these
 - **HTML-like content**: safe — using `textContent` + `createTextNode`, never `innerHTML`
 - **Whitespace-only diff**: `diffWordsWithSpace` preserves and highlights whitespace changes
 
@@ -90,6 +88,8 @@ if (bTd && aTd && shouldInlineHighlight(bVal, aVal)) {
 1. `npm run build` — confirm no type/build errors
 2. Load `dist/` in Chrome, open https://github.com/letconst/github-better-csv-diff/pull/2/changes
 3. Confirm: modified cells show cell-level background + inline word-level highlighting
-4. Confirm: fully changed cells (>80%) show only cell-level background
-5. Confirm: added/removed rows (no counterpart) are unaffected
-6. Test in dark mode — GitHub CSS variables should adapt automatically
+4. Confirm: fully changed cells show only cell-level background (no noisy inline spans)
+5. Confirm: short dissimilar values (e.g. `12` → `23`) show only cell-level background
+6. Confirm: single-token partial changes (e.g. `user123` → `user124`) show inline char-level highlighting
+7. Confirm: added/removed rows (no counterpart) are unaffected
+8. Test in dark mode — GitHub CSS variables should adapt automatically
