@@ -121,12 +121,14 @@ function findActionsArea(
   const area = header.querySelector<HTMLElement>(config.actionsSelector);
   if (area) return area;
 
-  // Fallback: locate via the "Viewed" button (aria-pressed toggle)
+  // Fallback for Preview UI: locate via the "Viewed" button (aria-pressed toggle)
   const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
   if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
     return viewedBtn.parentElement;
   }
-  return null;
+
+  // Fallback for Classic UI: use .file-actions container directly
+  return header.querySelector<HTMLElement>(".file-actions");
 }
 
 function createToggleButton(): HTMLButtonElement {
