@@ -121,9 +121,12 @@ function findActionsArea(
   const area = header.querySelector<HTMLElement>(config.actionsSelector);
   if (area) return area;
 
-  // Fallback: locate via the "Viewed" button (aria-pressed attribute)
+  // Fallback: locate via the "Viewed" button (aria-pressed toggle)
   const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
-  return viewedBtn?.parentElement ?? null;
+  if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
+    return viewedBtn.parentElement;
+  }
+  return null;
 }
 
 function createToggleButton(): HTMLButtonElement {
