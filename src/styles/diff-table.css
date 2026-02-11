@@ -9,9 +9,6 @@
   font-size: 12px;
   line-height: 20px;
   color: var(--fgColor-default, #1f2328);
-  border: 1px solid var(--borderColor-default, #d0d7de);
-  border-radius: 6px;
-  margin: 8px 0;
 }
 
 .csv-diff-side {
@@ -88,17 +85,12 @@
 
 /* Toggle button */
 .csv-diff-toggle-btn {
-  margin-left: 8px;
+  margin-right: 8px;
   cursor: pointer;
 }
 
 .csv-diff-toggle-active {
   font-weight: 600;
-}
-
-/* Wrapper for the injected table */
-.csv-diff-wrapper {
-  padding: 8px;
 }
 
 /* Prevent raw diff flash when Preview UI rebuilds DOM on re-expand.

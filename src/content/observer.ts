@@ -42,10 +42,9 @@ function processExistingDiffs(): void {
       // Wrapper still present — nothing to do
       if (container.querySelector(".csv-diff-wrapper")) continue;
 
-      // Wrapper is gone (GitHub rebuilt diffBody on re-expand).
-      // Clean up stale elements; keep PROCESSED_ATTR so CSS hides raw diff.
+      // Wrapper is gone (GitHub rebuilt diffBody on collapse/re-expand).
+      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand.
       container.removeAttribute("data-csv-diff-raw");
-      container.querySelector(".csv-diff-toggle-btn")?.remove();
     }
 
     const isClassic = container.hasAttribute("data-tagsearch-path");
@@ -63,8 +62,16 @@ function processExistingDiffs(): void {
 
     // Check if diff table is present (not collapsed)
     const table = container.querySelector(config.tableSelector);
-    if (!table) continue;
+    if (!table) {
+      // Collapsed: if previously processed, keep a toggle button in the header
+      if (container.hasAttribute(PROCESSED_ATTR)) {
+        ensurePlaceholderToggle(container, config);
+      }
+      continue;
+    }
 
+    // Remove stale toggle button before (re-)processing
+    container.querySelector(".csv-diff-toggle-btn")?.remove();
     processCsvDiffBlock(container, config, filename);
   }
 }
@@ -106,6 +113,63 @@ function processCsvDiffBlock(
   }
 }
 
+/** Find the actions area in the header, with fallback for Preview UI. */
+function findActionsArea(
+  header: HTMLElement,
+  config: UiConfig
+): HTMLElement | null {
+  const area = header.querySelector<HTMLElement>(config.actionsSelector);
+  if (area) return area;
+
+  // Fallback for Preview UI: locate via the "Viewed" button (aria-pressed toggle)
+  const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
+  if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
+    return viewedBtn.parentElement;
+  }
+
+  // Fallback for Classic UI: use .file-actions container directly
+  return header.querySelector<HTMLElement>(".file-actions");
+}
+
+function createToggleButton(): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
+  btn.textContent = "Raw Diff";
+  btn.type = "button";
+  return btn;
+}
+
+function insertToggleButton(
+  header: HTMLElement,
+  config: UiConfig,
+  btn: HTMLButtonElement
+): void {
+  const actionsArea = findActionsArea(header, config);
+  if (actionsArea) {
+    actionsArea.prepend(btn);
+  } else {
+    header.appendChild(btn);
+  }
+}
+
+/** Insert a toggle button into the header (used as placeholder when file is collapsed). */
+function ensurePlaceholderToggle(
+  container: HTMLElement,
+  config: UiConfig
+): void {
+  if (container.querySelector(".csv-diff-toggle-btn")) return;
+
+  const header = container.querySelector<HTMLElement>(config.headerSelector);
+  if (!header) return;
+
+  const btn = createToggleButton();
+  btn.classList.remove("csv-diff-toggle-active");
+  btn.disabled = true;
+  btn.setAttribute("aria-disabled", "true");
+  btn.title = "Expand the file to enable CSV table view";
+  insertToggleButton(header, config, btn);
+}
+
 function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement,
@@ -132,10 +196,7 @@ function injectTableOverlay(
     }
   }
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
-  toggleBtn.textContent = "Raw Diff";
-  toggleBtn.type = "button";
+  const toggleBtn = createToggleButton();
 
   toggleBtn.addEventListener("click", () => {
     const isTableVisible = wrapper.style.display !== "none";
@@ -147,12 +208,7 @@ function injectTableOverlay(
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
   });
 
-  const actionsArea = header.querySelector<HTMLElement>(config.actionsSelector);
-  if (actionsArea) {
-    actionsArea.prepend(toggleBtn);
-  } else {
-    header.appendChild(toggleBtn);
-  }
+  insertToggleButton(header, config, toggleBtn);
 
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(false);
