@@ -3,6 +3,11 @@
  */
 
 import type { CsvDiff } from "../parser/diffParser";
+import {
+  computeInlineDiff,
+  renderInlineBefore,
+  renderInlineAfter,
+} from "./inlineDiff";
 
 export interface MatchedRow {
   before: string[] | null;
@@ -87,26 +92,24 @@ function buildSide(
   for (const match of matched) {
     const row = side === "before" ? match.before : match.after;
     const tr = document.createElement("tr");
+    const isEmpty = row === null;
 
-    if (row === null) {
+    if (isEmpty) {
       tr.className = "csv-diff-row-empty";
-      for (let i = 0; i < maxCols; i++) {
-        const td = document.createElement("td");
-        td.textContent = "\u00A0"; // non-breaking space for height
-        tr.appendChild(td);
-      }
-    } else {
-      if (match.type === "added" && side === "after") {
-        tr.className = "csv-diff-row-added";
-      } else if (match.type === "removed" && side === "before") {
-        tr.className = "csv-diff-row-removed";
-      }
+    } else if (match.type === "added" && side === "after") {
+      tr.className = "csv-diff-row-added";
+    } else if (match.type === "removed" && side === "before") {
+      tr.className = "csv-diff-row-removed";
+    }
 
-      for (let i = 0; i < maxCols; i++) {
-        const td = document.createElement("td");
+    for (let i = 0; i < maxCols; i++) {
+      const td = document.createElement("td");
+      if (isEmpty) {
+        td.textContent = "\u00A0";
+      } else {
         td.textContent = i < row.length ? row[i] : "";
-        tr.appendChild(td);
       }
+      tr.appendChild(td);
     }
 
     tbody.appendChild(tr);
@@ -137,13 +140,21 @@ function highlightChangedCells(
 
     const maxCols = Math.max(match.before.length, match.after.length);
     for (let c = 0; c < maxCols; c++) {
-      const bVal = c < match.before.length ? match.before[c] : "";
-      const aVal = c < match.after.length ? match.after[c] : "";
-      if (bVal !== aVal) {
-        const bTd = beforeTr.children[c] as HTMLElement | undefined;
-        const aTd = afterTr.children[c] as HTMLElement | undefined;
-        if (bTd) bTd.classList.add("csv-diff-cell-removed");
-        if (aTd) aTd.classList.add("csv-diff-cell-changed");
+      const beforeVal = c < match.before.length ? match.before[c] : "";
+      const afterVal = c < match.after.length ? match.after[c] : "";
+      if (beforeVal === afterVal) continue;
+
+      const beforeTd = beforeTr.children[c] as HTMLElement | undefined;
+      const afterTd = afterTr.children[c] as HTMLElement | undefined;
+      if (beforeTd) beforeTd.classList.add("csv-diff-cell-removed");
+      if (afterTd) afterTd.classList.add("csv-diff-cell-changed");
+
+      const changes = beforeTd && afterTd ? computeInlineDiff(beforeVal, afterVal) : null;
+      if (beforeTd && afterTd && changes) {
+        beforeTd.textContent = "";
+        beforeTd.appendChild(renderInlineBefore(changes));
+        afterTd.textContent = "";
+        afterTd.appendChild(renderInlineAfter(changes));
       }
     }
   }

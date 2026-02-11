@@ -67,6 +67,18 @@
   color: var(--diffBlob-deletionLine-fgColor, #1f2328);
 }
 
+.csv-diff-inline-added {
+  background: var(--diffBlob-additionWord-bgColor, #abf2bc);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.csv-diff-inline-removed {
+  background: var(--diffBlob-deletionWord-bgColor, #ffcecb);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
 .csv-diff-header {
   padding: 6px 10px;
   font-weight: 600;
