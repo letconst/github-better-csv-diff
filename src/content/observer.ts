@@ -147,7 +147,16 @@ function injectTableOverlay(
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
   });
 
-  const actionsArea = header.querySelector<HTMLElement>(config.actionsSelector);
+  let actionsArea = header.querySelector<HTMLElement>(config.actionsSelector);
+
+  // Fallback: locate actions area via the "Viewed" button (aria-pressed attribute)
+  if (!actionsArea) {
+    const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
+    if (viewedBtn?.parentElement) {
+      actionsArea = viewedBtn.parentElement;
+    }
+  }
+
   if (actionsArea) {
     actionsArea.prepend(toggleBtn);
   } else {

@@ -45,7 +45,7 @@ export const CLASSIC_UI: UiConfig = {
   emptyClass: "empty-cell",
   headerSelector: ".file-header",
   contentSelector: ".js-file-content",
-  actionsSelector: ".file-actions",
+  actionsSelector: ".file-actions > .d-flex",
   extractContent: (cell) =>
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
   extractChangedContent: (cell) =>
