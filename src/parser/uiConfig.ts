@@ -28,8 +28,7 @@ export const PREVIEW_UI: UiConfig = {
   emptyClass: "empty-diff-line",
   headerSelector: ":scope > :first-child",
   contentSelector: ":scope > :nth-child(2)",
-  actionsSelector:
-    '[class*="diffHeaderActionWrapper"], [class*="ActionGroup"]',
+  actionsSelector: '[class*="diffHeaderActionWrapper"], [class*="ActionGroup"]',
   extractContent: (cell) => cell.textContent ?? "",
   extractChangedContent: (cell) => {
     const text = cell.textContent ?? "";

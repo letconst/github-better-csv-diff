@@ -67,7 +67,7 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
  */
 export function extractDiffLinesFromDom(
   container: HTMLElement,
-  ui: UiConfig
+  ui: UiConfig,
 ): DiffLine[] {
   const table = container.querySelector<HTMLTableElement>(ui.tableSelector);
   if (!table) {
@@ -84,8 +84,14 @@ export function extractDiffLinesFromDom(
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
     if (cells[0].classList.contains(ui.hunkClass)) continue;
-    if (cells.length === 3) { isUnifiedLayout = true; break; }
-    if (cells.length === 4) { isUnifiedLayout = false; break; }
+    if (cells.length === 3) {
+      isUnifiedLayout = true;
+      break;
+    }
+    if (cells.length === 4) {
+      isUnifiedLayout = false;
+      break;
+    }
     // Unexpected cell count — keep scanning
   }
 
@@ -126,7 +132,7 @@ export function extractDiffLinesFromDom(
       } else {
         console.warn(
           "[GitHub Better CSV Diff] Unhandled unified layout row",
-          ui.extractContent(cells[2])
+          ui.extractContent(cells[2]),
         );
       }
       continue;
@@ -168,4 +174,3 @@ export function extractDiffLinesFromDom(
 
   return result;
 }
-

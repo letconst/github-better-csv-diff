@@ -4,8 +4,9 @@
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 20px;
   color: var(--fgColor-default, #1f2328);
@@ -95,7 +96,9 @@
 
 /* Prevent raw diff flash when Preview UI rebuilds DOM on re-expand.
    Hides non-wrapper children immediately via CSS, before JS re-processes. */
-[data-csv-diff-processed][role="region"]:not([data-csv-diff-raw]) > :nth-child(2) > :not(.csv-diff-wrapper) {
+[data-csv-diff-processed][role="region"]:not([data-csv-diff-raw])
+  > :nth-child(2)
+  > :not(.csv-diff-wrapper) {
   display: none;
 }
 

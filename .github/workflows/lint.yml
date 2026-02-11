@@ -1,0 +1,68 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        name: Collapse previous lint comments
+        continue-on-error: true
+        run: |
+          gh api graphql -f query='
+            query($owner:String!,$repo:String!,$pr:Int!) {
+              repository(owner:$owner,name:$repo) {
+                pullRequest(number:$pr) {
+                  comments(last:100) {
+                    nodes { id body isMinimized }
+                  }
+                }
+              }
+            }' -f owner="${GITHUB_REPOSITORY_OWNER}" \
+               -f repo="${GITHUB_REPOSITORY#*/}" \
+               -F pr="$PR_NUMBER" \
+            --jq '.data.repository.pullRequest.comments.nodes[]
+              | select(.body | contains("<!-- lint-result -->"))
+              | select(.isMinimized == false)
+              | .id' \
+          | while read -r node_id; do
+              gh api graphql -f query='
+                mutation($id:ID!) {
+                  minimizeComment(input:{subjectId:$id,classifier:OUTDATED}) {
+                    minimizedComment { isMinimized }
+                  }
+                }' -f id="$node_id"
+            done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - if: failure() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+        name: Comment lint failure
+        continue-on-error: true
+        run: |
+          gh pr comment "$PR_NUMBER" --body "<!-- lint-result -->
+          > [!WARNING]
+          > **Lint failed** — Run \`npm run lint:fix\` to auto-fix."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}

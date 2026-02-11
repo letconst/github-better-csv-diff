@@ -4,9 +4,9 @@
  * Supports both Preview UI (/changes) and Classic UI (/files).
  */
 
-import { extractDiffLinesFromDom, diffToCsv } from "../parser/diffParser";
+import { diffToCsv, extractDiffLinesFromDom } from "../parser/diffParser";
+import { CLASSIC_UI, PREVIEW_UI, type UiConfig } from "../parser/uiConfig";
 import { renderDiffTable } from "../renderer/tableRenderer";
-import { PREVIEW_UI, CLASSIC_UI, type UiConfig } from "../parser/uiConfig";
 
 const PROCESSED_ATTR = "data-csv-diff-processed";
 const CSV_EXTENSIONS = [".csv", ".tsv"];
@@ -30,11 +30,11 @@ export function observeDiffContainers(): void {
 function processExistingDiffs(): void {
   // Preview UI containers
   const previewContainers = document.querySelectorAll<HTMLElement>(
-    'div[id^="diff-"][role="region"]'
+    'div[id^="diff-"][role="region"]',
   );
   // Classic UI containers
   const classicContainers = document.querySelectorAll<HTMLElement>(
-    "div.file.js-file[data-tagsearch-path]"
+    "div.file.js-file[data-tagsearch-path]",
   );
 
   for (const container of [...previewContainers, ...classicContainers]) {
@@ -51,12 +51,12 @@ function processExistingDiffs(): void {
     const config = isClassic ? CLASSIC_UI : PREVIEW_UI;
 
     const filename = isClassic
-      ? container.dataset.tagsearchPath ?? null
+      ? (container.dataset.tagsearchPath ?? null)
       : getFilenameFromH3(container);
     if (!filename) continue;
 
     const isCsv = CSV_EXTENSIONS.some((ext) =>
-      filename.toLowerCase().endsWith(ext)
+      filename.toLowerCase().endsWith(ext),
     );
     if (!isCsv) continue;
 
@@ -81,20 +81,27 @@ function getFilenameFromH3(container: HTMLElement): string | null {
   const h3 = container.querySelector("h3");
   if (!h3) return null;
 
-  return h3.textContent?.replace(/[\u200E\u200F\u2066\u2067\u2068\u2069\u200B\u200C\u200D\uFEFF]/g, "").trim() ?? null;
+  return (
+    h3.textContent
+      ?.replace(
+        /\u200E|\u200F|\u2066|\u2067|\u2068|\u2069|\u200B|\u200C|\u200D|\uFEFF/g,
+        "",
+      )
+      .trim() ?? null
+  );
 }
 
 function processCsvDiffBlock(
   container: HTMLElement,
   config: UiConfig,
-  filename: string
+  filename: string,
 ): void {
   try {
     const diffLines = extractDiffLinesFromDom(container, config);
     if (diffLines.length === 0) {
       console.warn(
         "[GitHub Better CSV Diff] No diff lines extracted from",
-        filename
+        filename,
       );
       return;
     }
@@ -108,7 +115,7 @@ function processCsvDiffBlock(
     console.error(
       "[GitHub Better CSV Diff] Error processing diff block:",
       filename,
-      error
+      error,
     );
   }
 }
@@ -116,7 +123,7 @@ function processCsvDiffBlock(
 /** Find the actions area in the header, with fallback for Preview UI. */
 function findActionsArea(
   header: HTMLElement,
-  config: UiConfig
+  config: UiConfig,
 ): HTMLElement | null {
   const area = header.querySelector<HTMLElement>(config.actionsSelector);
   if (area) return area;
@@ -142,7 +149,7 @@ function createToggleButton(): HTMLButtonElement {
 function insertToggleButton(
   header: HTMLElement,
   config: UiConfig,
-  btn: HTMLButtonElement
+  btn: HTMLButtonElement,
 ): void {
   const actionsArea = findActionsArea(header, config);
   if (actionsArea) {
@@ -155,7 +162,7 @@ function insertToggleButton(
 /** Insert a toggle button into the header (used as placeholder when file is collapsed). */
 function ensurePlaceholderToggle(
   container: HTMLElement,
-  config: UiConfig
+  config: UiConfig,
 ): void {
   if (container.querySelector(".csv-diff-toggle-btn")) return;
 
@@ -173,13 +180,15 @@ function ensurePlaceholderToggle(
 function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement,
-  config: UiConfig
+  config: UiConfig,
 ): boolean {
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   const diffBody = container.querySelector<HTMLElement>(config.contentSelector);
 
   if (!header || !diffBody) {
-    console.warn("[GitHub Better CSV Diff] Could not find header/body in container");
+    console.warn(
+      "[GitHub Better CSV Diff] Could not find header/body in container",
+    );
     return false;
   }
 
