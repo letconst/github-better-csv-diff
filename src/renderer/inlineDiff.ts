@@ -22,7 +22,8 @@ function unchangedRatio(
  * Computes inline diff changes between two cell values.
  * Tries word-level diff first; falls back to character-level diff
  * for single-token values (IDs, emails, codes without spaces).
- * Returns null if either value is empty or if >80% of content changed.
+ * Returns null if either value is empty, or if both word- and char-level
+ * diffs exceed the configured change thresholds.
  */
 export function computeInlineDiff(
   before: string,
