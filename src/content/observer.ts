@@ -126,6 +126,27 @@ function findActionsArea(
   return viewedBtn?.parentElement ?? null;
 }
 
+function createToggleButton(): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
+  btn.textContent = "Raw Diff";
+  btn.type = "button";
+  return btn;
+}
+
+function insertToggleButton(
+  header: HTMLElement,
+  config: UiConfig,
+  btn: HTMLButtonElement
+): void {
+  const actionsArea = findActionsArea(header, config);
+  if (actionsArea) {
+    actionsArea.prepend(btn);
+  } else {
+    header.appendChild(btn);
+  }
+}
+
 /** Insert a toggle button into the header (used as placeholder when file is collapsed). */
 function ensurePlaceholderToggle(
   container: HTMLElement,
@@ -136,17 +157,7 @@ function ensurePlaceholderToggle(
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   if (!header) return;
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
-  toggleBtn.textContent = "Raw Diff";
-  toggleBtn.type = "button";
-
-  const actionsArea = findActionsArea(header, config);
-  if (actionsArea) {
-    actionsArea.prepend(toggleBtn);
-  } else {
-    header.appendChild(toggleBtn);
-  }
+  insertToggleButton(header, config, createToggleButton());
 }
 
 function injectTableOverlay(
@@ -175,10 +186,7 @@ function injectTableOverlay(
     }
   }
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
-  toggleBtn.textContent = "Raw Diff";
-  toggleBtn.type = "button";
+  const toggleBtn = createToggleButton();
 
   toggleBtn.addEventListener("click", () => {
     const isTableVisible = wrapper.style.display !== "none";
@@ -190,12 +198,7 @@ function injectTableOverlay(
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
   });
 
-  const actionsArea = findActionsArea(header, config);
-  if (actionsArea) {
-    actionsArea.prepend(toggleBtn);
-  } else {
-    header.appendChild(toggleBtn);
-  }
+  insertToggleButton(header, config, toggleBtn);
 
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(false);
