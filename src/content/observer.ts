@@ -157,7 +157,12 @@ function ensurePlaceholderToggle(
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   if (!header) return;
 
-  insertToggleButton(header, config, createToggleButton());
+  const btn = createToggleButton();
+  btn.classList.remove("csv-diff-toggle-active");
+  btn.disabled = true;
+  btn.setAttribute("aria-disabled", "true");
+  btn.title = "Expand the file to enable CSV table view";
+  insertToggleButton(header, config, btn);
 }
 
 function injectTableOverlay(
