@@ -1,6 +1,6 @@
 import { diffWordsWithSpace } from "diff";
 
-const INLINE_DIFF_THRESHOLD = 0.85;
+const inlineDiffThreshold = 0.85;
 
 /**
  * Determines whether inline highlighting should be applied.
@@ -23,7 +23,7 @@ export function shouldInlineHighlight(
     }
   }
 
-  return changedChars / totalChars <= INLINE_DIFF_THRESHOLD;
+  return changedChars / totalChars <= inlineDiffThreshold;
 }
 
 /**
