@@ -4,7 +4,7 @@
 
 import type { CsvDiff } from "../parser/diffParser";
 import {
-  shouldInlineHighlight,
+  computeInlineDiff,
   renderInlineBefore,
   renderInlineAfter,
 } from "./inlineDiff";
@@ -149,11 +149,12 @@ function highlightChangedCells(
       if (beforeTd) beforeTd.classList.add("csv-diff-cell-removed");
       if (afterTd) afterTd.classList.add("csv-diff-cell-changed");
 
-      if (beforeTd && afterTd && shouldInlineHighlight(beforeVal, afterVal)) {
+      const changes = beforeTd && afterTd ? computeInlineDiff(beforeVal, afterVal) : null;
+      if (beforeTd && afterTd && changes) {
         beforeTd.textContent = "";
-        beforeTd.appendChild(renderInlineBefore(beforeVal, afterVal));
+        beforeTd.appendChild(renderInlineBefore(changes));
         afterTd.textContent = "";
-        afterTd.appendChild(renderInlineAfter(beforeVal, afterVal));
+        afterTd.appendChild(renderInlineAfter(changes));
       }
     }
   }

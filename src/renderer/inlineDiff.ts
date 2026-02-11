@@ -1,39 +1,51 @@
-import { diffWordsWithSpace } from "diff";
+import { diffWordsWithSpace, diffChars, type Change } from "diff";
 
 const inlineDiffThreshold = 0.8;
+const charFallbackThreshold = 0.6;
 
-/**
- * Determines whether inline highlighting should be applied.
- * Returns false if either value is empty or if >80% of content changed.
- */
-export function shouldInlineHighlight(
+function unchangedRatio(
+  changes: Change[],
   before: string,
   after: string
-): boolean {
-  if (before === "" || after === "") return false;
-
-  const changes = diffWordsWithSpace(before, after);
-
+): number {
   let unchangedChars = 0;
   for (const change of changes) {
     if (!change.added && !change.removed) {
       unchangedChars += change.value.length;
     }
   }
-
   const maxLen = Math.max(before.length, after.length);
-  return unchangedChars / maxLen >= 1 - inlineDiffThreshold;
+  return maxLen === 0 ? 0 : unchangedChars / maxLen;
+}
+
+/**
+ * Computes inline diff changes between two cell values.
+ * Tries word-level diff first; falls back to character-level diff
+ * for single-token values (IDs, emails, codes without spaces).
+ * Returns null if either value is empty or if >80% of content changed.
+ */
+export function computeInlineDiff(
+  before: string,
+  after: string
+): Change[] | null {
+  if (before === "" || after === "") return null;
+
+  const wordChanges = diffWordsWithSpace(before, after);
+  if (unchangedRatio(wordChanges, before, after) >= 1 - inlineDiffThreshold)
+    return wordChanges;
+
+  const charChanges = diffChars(before, after);
+  if (unchangedRatio(charChanges, before, after) >= charFallbackThreshold)
+    return charChanges;
+
+  return null;
 }
 
 /**
  * Builds DOM nodes for a "before" (deletion) cell with inline diff spans.
  * Removed segments are wrapped in <span class="csv-diff-inline-removed">.
  */
-export function renderInlineBefore(
-  before: string,
-  after: string
-): DocumentFragment {
-  const changes = diffWordsWithSpace(before, after);
+export function renderInlineBefore(changes: Change[]): DocumentFragment {
   const fragment = document.createDocumentFragment();
 
   for (const change of changes) {
@@ -55,11 +67,7 @@ export function renderInlineBefore(
  * Builds DOM nodes for an "after" (addition) cell with inline diff spans.
  * Added segments are wrapped in <span class="csv-diff-inline-added">.
  */
-export function renderInlineAfter(
-  before: string,
-  after: string
-): DocumentFragment {
-  const changes = diffWordsWithSpace(before, after);
+export function renderInlineAfter(changes: Change[]): DocumentFragment {
   const fragment = document.createDocumentFragment();
 
   for (const change of changes) {
