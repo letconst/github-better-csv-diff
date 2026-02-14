@@ -8,16 +8,24 @@ import type { UiConfig } from "./uiConfig";
 export interface DiffLine {
   type: "added" | "removed" | "unchanged";
   content: string;
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
 }
 
 export interface CsvDiff {
   before: string[][];
   after: string[][];
+  beforeLineNumbers: Array<number | null>;
+  afterLineNumbers: Array<number | null>;
 }
 
 export function parseUnifiedDiff(diffText: string): DiffLine[] {
   const lines = diffText.split("\n");
   const result: DiffLine[] = [];
+
+  function makeLine(type: DiffLine["type"], content: string): DiffLine {
+    return { type, content, oldLineNumber: null, newLineNumber: null };
+  }
 
   for (const line of lines) {
     if (
@@ -30,11 +38,11 @@ export function parseUnifiedDiff(diffText: string): DiffLine[] {
     }
 
     if (line.startsWith("+")) {
-      result.push({ type: "added", content: line.slice(1) });
+      result.push(makeLine("added", line.slice(1)));
     } else if (line.startsWith("-")) {
-      result.push({ type: "removed", content: line.slice(1) });
+      result.push(makeLine("removed", line.slice(1)));
     } else if (line.startsWith(" ")) {
-      result.push({ type: "unchanged", content: line.slice(1) });
+      result.push(makeLine("unchanged", line.slice(1)));
     }
   }
 
@@ -44,19 +52,34 @@ export function parseUnifiedDiff(diffText: string): DiffLine[] {
 export function diffToCsv(lines: DiffLine[]): CsvDiff {
   const beforeLines: string[] = [];
   const afterLines: string[] = [];
+  const beforeLineNumbers: Array<number | null> = [];
+  const afterLineNumbers: Array<number | null> = [];
 
   for (const line of lines) {
     if (line.type === "removed" || line.type === "unchanged") {
       beforeLines.push(line.content);
+      beforeLineNumbers.push(line.oldLineNumber);
     }
     if (line.type === "added" || line.type === "unchanged") {
       afterLines.push(line.content);
+      afterLineNumbers.push(line.newLineNumber);
     }
   }
 
+  const before = parseCsv(beforeLines.join("\n"));
+  const after = parseCsv(afterLines.join("\n"));
+
   return {
-    before: parseCsv(beforeLines.join("\n")),
-    after: parseCsv(afterLines.join("\n")),
+    before,
+    after,
+    beforeLineNumbers:
+      before.length === beforeLineNumbers.length
+        ? beforeLineNumbers
+        : Array(before.length).fill(null),
+    afterLineNumbers:
+      after.length === afterLineNumbers.length
+        ? afterLineNumbers
+        : Array(after.length).fill(null),
   };
 }
 
@@ -118,16 +141,22 @@ export function extractDiffLinesFromDom(
         result.push({
           type: "unchanged",
           content: ui.extractContent(cells[2]),
+          oldLineNumber: ui.extractLineNumber(cells[0]),
+          newLineNumber: ui.extractLineNumber(cells[1]),
         });
       } else if (oldEmpty) {
         result.push({
           type: "added",
           content: ui.extractChangedContent(cells[2]),
+          oldLineNumber: null,
+          newLineNumber: ui.extractLineNumber(cells[1]),
         });
       } else if (newEmpty) {
         result.push({
           type: "removed",
           content: ui.extractChangedContent(cells[2]),
+          oldLineNumber: ui.extractLineNumber(cells[0]),
+          newLineNumber: null,
         });
       } else {
         console.warn(
@@ -148,26 +177,36 @@ export function extractDiffLinesFromDom(
       result.push({
         type: "unchanged",
         content: ui.extractContent(cells[1]),
+        oldLineNumber: ui.extractLineNumber(cells[0]),
+        newLineNumber: ui.extractLineNumber(cells[2]),
       });
     } else if (leftEmpty) {
       result.push({
         type: "added",
         content: ui.extractChangedContent(cells[3]),
+        oldLineNumber: null,
+        newLineNumber: ui.extractLineNumber(cells[2]),
       });
     } else if (rightEmpty) {
       result.push({
         type: "removed",
         content: ui.extractChangedContent(cells[1]),
+        oldLineNumber: ui.extractLineNumber(cells[0]),
+        newLineNumber: null,
       });
     } else {
       // Modified line -- both sides present
       result.push({
         type: "removed",
         content: ui.extractChangedContent(cells[1]),
+        oldLineNumber: ui.extractLineNumber(cells[0]),
+        newLineNumber: null,
       });
       result.push({
         type: "added",
         content: ui.extractChangedContent(cells[3]),
+        oldLineNumber: null,
+        newLineNumber: ui.extractLineNumber(cells[2]),
       });
     }
   }
