@@ -18,6 +18,8 @@ export interface UiConfig {
   extractContent(cell: HTMLTableCellElement): string;
   /** Extract text from a changed (added/removed) content cell, stripping diff marker if present. */
   extractChangedContent(cell: HTMLTableCellElement): string;
+  /** Extract the line number from a line-number cell, or null if the cell is empty. */
+  extractLineNumber(cell: HTMLTableCellElement): number | null;
 }
 
 export const PREVIEW_UI: UiConfig = {
@@ -34,6 +36,12 @@ export const PREVIEW_UI: UiConfig = {
     const text = cell.textContent ?? "";
     return text.startsWith("+") || text.startsWith("-") ? text.slice(1) : text;
   },
+  extractLineNumber: (cell) => {
+    const text = cell.textContent?.trim();
+    if (!text) return null;
+    const num = parseInt(text, 10);
+    return Number.isNaN(num) ? null : num;
+  },
 };
 
 export const CLASSIC_UI: UiConfig = {
@@ -49,4 +57,10 @@ export const CLASSIC_UI: UiConfig = {
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
   extractChangedContent: (cell) =>
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
+  extractLineNumber: (cell) => {
+    const attr = cell.getAttribute("data-line-number");
+    if (attr == null) return null;
+    const num = parseInt(attr, 10);
+    return Number.isNaN(num) ? null : num;
+  },
 };

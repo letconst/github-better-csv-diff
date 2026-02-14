@@ -13,6 +13,8 @@ export interface MatchedRow {
   before: string[] | null;
   after: string[] | null;
   type: "added" | "removed" | "modified" | "unchanged";
+  beforeLineNumber: number | null;
+  afterLineNumber: number | null;
 }
 
 export function renderDiffTable(diff: CsvDiff): HTMLElement {
@@ -23,6 +25,8 @@ export function renderDiffTable(diff: CsvDiff): HTMLElement {
   const afterHeaders = diff.after[0] ?? [];
   const beforeData = diff.before.slice(1);
   const afterData = diff.after.slice(1);
+  const beforeLineNums = diff.beforeLineNumbers.slice(1);
+  const afterLineNums = diff.afterLineNumbers.slice(1);
 
   const maxCols = Math.max(
     beforeHeaders.length,
@@ -31,7 +35,12 @@ export function renderDiffTable(diff: CsvDiff): HTMLElement {
     ...afterData.map((row) => row.length),
   );
 
-  const matched = matchRows(beforeData, afterData);
+  const matched = matchRows(
+    beforeData,
+    afterData,
+    beforeLineNums,
+    afterLineNums,
+  );
 
   container.appendChild(
     buildSide("Before", beforeHeaders, matched, "before", maxCols),
@@ -79,6 +88,12 @@ function buildSide(
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
 
+  // Line number header cell
+  const lineNumTh = document.createElement("th");
+  lineNumTh.className = "csv-diff-line-num";
+  lineNumTh.textContent = "#";
+  headerRow.appendChild(lineNumTh);
+
   for (let i = 0; i < maxCols; i++) {
     const th = document.createElement("th");
     th.textContent = i < headers.length ? headers[i] : "";
@@ -91,6 +106,8 @@ function buildSide(
 
   for (const match of matched) {
     const row = side === "before" ? match.before : match.after;
+    const lineNum =
+      side === "before" ? match.beforeLineNumber : match.afterLineNumber;
     const tr = document.createElement("tr");
     const isEmpty = row === null;
 
@@ -101,6 +118,13 @@ function buildSide(
     } else if (match.type === "removed" && side === "before") {
       tr.className = "csv-diff-row-removed";
     }
+
+    // Line number cell
+    const lineNumTd = document.createElement("td");
+    lineNumTd.className = "csv-diff-line-num";
+    lineNumTd.textContent =
+      !isEmpty && lineNum != null ? String(lineNum) : "\u00A0";
+    tr.appendChild(lineNumTd);
 
     for (let i = 0; i < maxCols; i++) {
       const td = document.createElement("td");
@@ -144,8 +168,9 @@ function highlightChangedCells(
       const afterVal = c < match.after.length ? match.after[c] : "";
       if (beforeVal === afterVal) continue;
 
-      const beforeTd = beforeTr.children[c] as HTMLElement | undefined;
-      const afterTd = afterTr.children[c] as HTMLElement | undefined;
+      // +1 offset to skip the line number cell at children[0]
+      const beforeTd = beforeTr.children[c + 1] as HTMLElement | undefined;
+      const afterTd = afterTr.children[c + 1] as HTMLElement | undefined;
       if (beforeTd) beforeTd.classList.add("csv-diff-cell-removed");
       if (afterTd) afterTd.classList.add("csv-diff-cell-changed");
 
@@ -163,11 +188,20 @@ function highlightChangedCells(
 
 // --- Row matching ---
 
-export function matchRows(before: string[][], after: string[][]): MatchedRow[] {
+function lineNumAt(nums: Array<number | null>, i: number): number | null {
+  return nums[i] ?? null;
+}
+
+export function matchRows(
+  before: string[][],
+  after: string[][],
+  beforeLineNums: Array<number | null>,
+  afterLineNums: Array<number | null>,
+): MatchedRow[] {
   if (isFirstColumnKey(before, after)) {
-    return matchByKey(before, after);
+    return matchByKey(before, after, beforeLineNums, afterLineNums);
   }
-  return matchByOrder(before, after);
+  return matchByOrder(before, after, beforeLineNums, afterLineNums);
 }
 
 function isFirstColumnKey(before: string[][], after: string[][]): boolean {
@@ -187,7 +221,12 @@ function isFirstColumnKey(before: string[][], after: string[][]): boolean {
   return maxLen > 0 && overlap / maxLen >= 0.3;
 }
 
-function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
+function matchByKey(
+  before: string[][],
+  after: string[][],
+  beforeLineNums: Array<number | null>,
+  afterLineNums: Array<number | null>,
+): MatchedRow[] {
   const beforeMap = new Map<string, string[]>();
   for (const row of before) beforeMap.set(row[0] ?? "", row);
 
@@ -199,7 +238,8 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
   const result: MatchedRow[] = [];
   let nextAfterFlush = 0;
 
-  for (const beforeRow of before) {
+  for (let bi = 0; bi < before.length; bi++) {
+    const beforeRow = before[bi];
     const key = beforeRow[0] ?? "";
     const ai = afterIndex.get(key);
 
@@ -208,7 +248,13 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
       for (let j = nextAfterFlush; j < ai; j++) {
         const afterKey = after[j][0] ?? "";
         if (!beforeMap.has(afterKey)) {
-          result.push({ before: null, after: after[j], type: "added" });
+          result.push({
+            before: null,
+            after: after[j],
+            type: "added",
+            beforeLineNumber: null,
+            afterLineNumber: lineNumAt(afterLineNums, j),
+          });
         }
       }
       nextAfterFlush = Math.max(nextAfterFlush, ai + 1);
@@ -218,9 +264,17 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
         before: beforeRow,
         after: after[ai],
         type: equal ? "unchanged" : "modified",
+        beforeLineNumber: lineNumAt(beforeLineNums, bi),
+        afterLineNumber: lineNumAt(afterLineNums, ai),
       });
     } else {
-      result.push({ before: beforeRow, after: null, type: "removed" });
+      result.push({
+        before: beforeRow,
+        after: null,
+        type: "removed",
+        beforeLineNumber: lineNumAt(beforeLineNums, bi),
+        afterLineNumber: null,
+      });
     }
   }
 
@@ -228,14 +282,25 @@ function matchByKey(before: string[][], after: string[][]): MatchedRow[] {
   for (let j = nextAfterFlush; j < after.length; j++) {
     const afterKey = after[j][0] ?? "";
     if (!beforeMap.has(afterKey)) {
-      result.push({ before: null, after: after[j], type: "added" });
+      result.push({
+        before: null,
+        after: after[j],
+        type: "added",
+        beforeLineNumber: null,
+        afterLineNumber: lineNumAt(afterLineNums, j),
+      });
     }
   }
 
   return result;
 }
 
-function matchByOrder(before: string[][], after: string[][]): MatchedRow[] {
+function matchByOrder(
+  before: string[][],
+  after: string[][],
+  beforeLineNums: Array<number | null>,
+  afterLineNums: Array<number | null>,
+): MatchedRow[] {
   const result: MatchedRow[] = [];
   const maxLen = Math.max(before.length, after.length);
 
@@ -249,11 +314,25 @@ function matchByOrder(before: string[][], after: string[][]): MatchedRow[] {
         before: b,
         after: a,
         type: equal ? "unchanged" : "modified",
+        beforeLineNumber: lineNumAt(beforeLineNums, i),
+        afterLineNumber: lineNumAt(afterLineNums, i),
       });
     } else if (b) {
-      result.push({ before: b, after: null, type: "removed" });
+      result.push({
+        before: b,
+        after: null,
+        type: "removed",
+        beforeLineNumber: lineNumAt(beforeLineNums, i),
+        afterLineNumber: null,
+      });
     } else if (a) {
-      result.push({ before: null, after: a, type: "added" });
+      result.push({
+        before: null,
+        after: a,
+        type: "added",
+        beforeLineNumber: null,
+        afterLineNumber: lineNumAt(afterLineNums, i),
+      });
     }
   }
 
