@@ -162,6 +162,12 @@ function highlightChangedCells(
     const afterTr = afterRows[i];
     if (!beforeTr || !afterTr) continue;
 
+    // Style line number cells for modified rows
+    const beforeLineNum = beforeTr.children[0] as HTMLElement | undefined;
+    const afterLineNum = afterTr.children[0] as HTMLElement | undefined;
+    if (beforeLineNum) beforeLineNum.classList.add("csv-diff-line-num-removed");
+    if (afterLineNum) afterLineNum.classList.add("csv-diff-line-num-added");
+
     const maxCols = Math.max(match.before.length, match.after.length);
     for (let c = 0; c < maxCols; c++) {
       const beforeVal = c < match.before.length ? match.before[c] : "";
