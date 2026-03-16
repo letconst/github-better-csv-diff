@@ -9,3 +9,4 @@
 .playwright-cli/*
 
 .DS_Store
+*.local.*
