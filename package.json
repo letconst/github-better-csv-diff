@@ -1,7 +1,7 @@
 {
   "name": "github-better-csv-diff",
   "version": "0.1.0",
-  "description": "Chrome extension that renders CSV file diffs as side-by-side tables in GitHub PRs",
+  "description": "Browser extension that renders CSV file diffs as side-by-side tables in GitHub PRs",
   "type": "module",
   "scripts": {
     "dev": "wxt",
