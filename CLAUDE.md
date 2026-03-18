@@ -2,7 +2,7 @@
 
 ## Overview
 
-Browser extension (Chrome + Firefox) that renders CSV file diffs as side-by-side tables in GitHub PR "Files changed" tabs.
+Browser extension (Chrome + Firefox) that renders CSV file diffs as side-by-side tables on GitHub (PR file reviews, commit diffs, etc.).
 
 ## Tech Stack
 
@@ -12,7 +12,7 @@ Browser extension (Chrome + Firefox) that renders CSV file diffs as side-by-side
 
 ## Architecture
 
-- Content Script injected on `github.com/*/pull/*/files`
+- Content Script injected on `github.com/*`
 - Diff data extracted from GitHub DOM (no REST API, no auth required)
 - SPA navigation handled via MutationObserver
 - Table injected as a toggle overlay above the original diff block

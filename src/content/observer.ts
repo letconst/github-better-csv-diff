@@ -1,7 +1,7 @@
 /**
- * MutationObserver that watches for CSV diff blocks in the GitHub PR DOM.
+ * MutationObserver that watches for CSV diff blocks in the GitHub DOM.
  * Handles SPA navigation by re-scanning when new diff containers appear.
- * Supports both Preview UI (/changes) and Classic UI (/files).
+ * Supports PR pages, commit pages, and both Preview UI and Classic UI.
  */
 
 import { diffToCsv, extractDiffLinesFromDom } from "../parser/diffParser";
@@ -28,10 +28,11 @@ export function observeDiffContainers(): void {
 }
 
 function processExistingDiffs(): void {
-  // Preview UI containers
-  const previewContainers = document.querySelectorAll<HTMLElement>(
-    'div[id^="diff-"][role="region"]',
-  );
+  // Preview UI containers (PR + commit pages).
+  // Use a broad selector so collapsed files (no table in DOM) are still found.
+  // Non-diff regions are filtered out by the filename/CSV check below.
+  const previewContainers =
+    document.querySelectorAll<HTMLElement>('div[role="region"]');
   // Classic UI containers
   const classicContainers = document.querySelectorAll<HTMLElement>(
     "div.file.js-file[data-tagsearch-path]",
@@ -132,6 +133,14 @@ function findActionsArea(
   const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
   if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
     return viewedBtn.parentElement;
+  }
+
+  // Fallback for commit page: locate via "More options" button's parent container
+  const moreBtn = header.querySelector<HTMLElement>(
+    'button[aria-label="More options"]',
+  );
+  if (moreBtn?.parentElement) {
+    return moreBtn.parentElement;
   }
 
   // Fallback for Classic UI: use .file-actions container directly
