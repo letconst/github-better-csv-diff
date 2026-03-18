@@ -28,10 +28,11 @@ export function observeDiffContainers(): void {
 }
 
 function processExistingDiffs(): void {
-  // Preview UI containers (PR + commit pages)
-  const previewContainers = document.querySelectorAll<HTMLElement>(
-    'div[role="region"]:has(table[role="grid"][aria-label^="Diff for:"])',
-  );
+  // Preview UI containers (PR + commit pages).
+  // Use a broad selector so collapsed files (no table in DOM) are still found.
+  // Non-diff regions are filtered out by the filename/CSV check below.
+  const previewContainers =
+    document.querySelectorAll<HTMLElement>('div[role="region"]');
   // Classic UI containers
   const classicContainers = document.querySelectorAll<HTMLElement>(
     "div.file.js-file[data-tagsearch-path]",
