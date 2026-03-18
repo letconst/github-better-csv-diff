@@ -134,8 +134,12 @@ export function extractDiffLinesFromDom(
     if (isUnifiedLayout) {
       // Unified layout: cells[0]=old line num, cells[1]=new line num, cells[2]=content
       const isContext = cells[0].classList.contains(ui.contextClass);
-      const oldEmpty = cells[0].classList.contains(ui.emptyClass);
-      const newEmpty = cells[1].classList.contains(ui.emptyClass);
+      const oldEmpty =
+        cells[0].classList.contains(ui.emptyClass) ||
+        ui.extractLineNumber(cells[0]) === null;
+      const newEmpty =
+        cells[1].classList.contains(ui.emptyClass) ||
+        ui.extractLineNumber(cells[1]) === null;
 
       if (isContext) {
         result.push({
@@ -144,14 +148,14 @@ export function extractDiffLinesFromDom(
           oldLineNumber: ui.extractLineNumber(cells[0]),
           newLineNumber: ui.extractLineNumber(cells[1]),
         });
-      } else if (oldEmpty) {
+      } else if (oldEmpty && !newEmpty) {
         result.push({
           type: "added",
           content: ui.extractChangedContent(cells[2]),
           oldLineNumber: null,
           newLineNumber: ui.extractLineNumber(cells[1]),
         });
-      } else if (newEmpty) {
+      } else if (newEmpty && !oldEmpty) {
         result.push({
           type: "removed",
           content: ui.extractChangedContent(cells[2]),
