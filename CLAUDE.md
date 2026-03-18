@@ -54,6 +54,10 @@ For Firefox, load `dist/firefox-mv2/` via `about:debugging`.
 
 To verify extension behavior in the browser, use `playwright-cli open --extension` to connect to the user's running browser with the extension installed.
 
+## Plan Files
+
+- Plan files (`.claude/plans/`) should be committed as the **last commit** on the branch, after all implementation and docs commits.
+
 ## Key Decisions
 
 - DOM-based diff parsing (not GitHub REST API) to avoid authentication
