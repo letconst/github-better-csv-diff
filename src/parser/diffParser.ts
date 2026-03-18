@@ -83,6 +83,14 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
   };
 }
 
+/** Check whether a line-number cell is empty (no line number present). */
+function isCellEmpty(cell: HTMLTableCellElement, ui: UiConfig): boolean {
+  return (
+    cell.classList.contains(ui.emptyClass) ||
+    ui.extractLineNumber(cell) === null
+  );
+}
+
 /**
  * Extracts DiffLine[] directly from a GitHub diff container's DOM.
  * Supports both Preview UI and Classic UI via the UiConfig parameter.
@@ -134,12 +142,8 @@ export function extractDiffLinesFromDom(
     if (isUnifiedLayout) {
       // Unified layout: cells[0]=old line num, cells[1]=new line num, cells[2]=content
       const isContext = cells[0].classList.contains(ui.contextClass);
-      const oldEmpty =
-        cells[0].classList.contains(ui.emptyClass) ||
-        ui.extractLineNumber(cells[0]) === null;
-      const newEmpty =
-        cells[1].classList.contains(ui.emptyClass) ||
-        ui.extractLineNumber(cells[1]) === null;
+      const oldEmpty = isCellEmpty(cells[0], ui);
+      const newEmpty = isCellEmpty(cells[1], ui);
 
       if (isContext) {
         result.push({
