@@ -5,7 +5,6 @@ export default defineConfig({
   outDir: "dist",
   manifest: {
     name: "GitHub Better CSV Diff",
-    description:
-      "Renders CSV file diffs as side-by-side tables in GitHub PR file reviews",
+    description: "Renders CSV file diffs as side-by-side tables on GitHub",
   },
 });
