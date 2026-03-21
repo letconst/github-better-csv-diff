@@ -2,6 +2,13 @@
   "name": "github-better-csv-diff",
   "version": "0.1.0",
   "description": "Browser extension that renders CSV file diffs as side-by-side tables on GitHub",
+  "author": "letconst",
+  "license": "MIT",
+  "homepage": "https://github.com/letconst/github-better-csv-diff",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letconst/github-better-csv-diff.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -17,6 +24,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.14",
     "@types/papaparse": "^5.5.2",
+    "@wxt-dev/auto-icons": "^1.1.1",
     "typescript": "^5.9.3",
     "wxt": "^0.20.0"
   },
