@@ -5,12 +5,12 @@
  */
 
 import "../styles/diff-table.css";
-import { observeDiffContainers } from "../content/observer";
+import { initObserverLifecycle } from "../content/observer";
 
 export default defineContentScript({
   matches: ["https://github.com/*"],
   main() {
     console.log("[GitHub Better CSV Diff] Content script loaded");
-    observeDiffContainers();
+    initObserverLifecycle();
   },
 });
