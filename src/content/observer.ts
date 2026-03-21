@@ -1,30 +1,79 @@
 /**
  * MutationObserver that watches for CSV diff blocks in the GitHub DOM.
- * Handles SPA navigation by re-scanning when new diff containers appear.
+ * Handles SPA navigation by connecting/disconnecting based on route.
  * Supports PR pages, commit pages, and both Preview UI and Classic UI.
  */
 
 import { diffToCsv, extractDiffLinesFromDom } from "../parser/diffParser";
 import { CLASSIC_UI, PREVIEW_UI, type UiConfig } from "../parser/uiConfig";
 import { renderDiffTable } from "../renderer/tableRenderer";
+import { isDiffRoute } from "./routes";
+
+type CancellableCallback = MutationCallback & { cancel: () => void };
 
 const PROCESSED_ATTR = "data-csv-diff-processed";
 const CSV_EXTENSIONS = [".csv", ".tsv"];
 
-export function observeDiffContainers(): void {
+let observer: MutationObserver | null = null;
+let debouncedCallback: CancellableCallback | null = null;
+// biome-ignore lint/correctness/noUnusedVariables: retained for future teardown
+let urlPollTimer: ReturnType<typeof setInterval> | null = null;
+let lifecycleInitialized = false;
+
+export function initObserverLifecycle(): void {
+  if (lifecycleInitialized) return;
+  lifecycleInitialized = true;
+
+  // Teardown BEFORE Turbo/PJAX swaps the page body
+  document.addEventListener("turbo:before-render", disconnectObserver);
+  document.addEventListener("turbo:before-cache", disconnectObserver);
+  document.addEventListener("pjax:start", disconnectObserver);
+
+  // Re-check route AFTER navigation completes
+  document.addEventListener("turbo:load", syncObserverWithRoute);
+  document.addEventListener("pjax:end", syncObserverWithRoute);
+  window.addEventListener("popstate", syncObserverWithRoute);
+
+  // Poll for URL changes that bypass Turbo/PJAX events (e.g. GitHub PR tab
+  // switches via pushState in the main world, invisible to content script's
+  // isolated world). Safe if DOM isn't ready: processExistingDiffs is idempotent,
+  // and the MutationObserver will catch later inserts.
+  urlPollTimer = watchUrlChanges(syncObserverWithRoute);
+
+  // Initial route check
+  syncObserverWithRoute();
+}
+
+function syncObserverWithRoute(): void {
+  if (!isDiffRoute()) {
+    disconnectObserver();
+    return;
+  }
+  // Scan BEFORE connecting observer to avoid self-triggered debounced pass
+  // (processExistingDiffs mutates DOM via wrapper/button injection)
   processExistingDiffs();
+  connectObserver();
+}
 
-  const observer = new MutationObserver(debounce(processExistingDiffs, 300));
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+function connectObserver(): void {
+  if (observer || !document.body) return;
+  debouncedCallback = debounce(processExistingDiffs, 300);
+  observer = new MutationObserver(debouncedCallback);
+  observer.observe(document.body, { childList: true, subtree: true });
+  console.debug(
+    "[GitHub Better CSV Diff] Observer connected",
+    location.pathname,
+  );
+}
 
-  // SPA navigation backup (GitHub uses Turbo / PJAX)
-  document.addEventListener("turbo:load", processExistingDiffs);
-  document.addEventListener("pjax:end", processExistingDiffs);
-
-  console.log("[GitHub Better CSV Diff] Observer initialized");
+function disconnectObserver(): void {
+  // Cancel pending debounce even if observer is already null (fully idempotent)
+  debouncedCallback?.cancel();
+  debouncedCallback = null;
+  if (!observer) return;
+  observer.disconnect();
+  observer = null;
+  console.debug("[GitHub Better CSV Diff] Observer disconnected");
 }
 
 function processExistingDiffs(): void {
@@ -234,10 +283,40 @@ function injectTableOverlay(
   return true;
 }
 
-function debounce(fn: () => void, delayMs: number): MutationCallback {
+/**
+ * Poll for pathname changes to detect SPA navigations invisible to the content
+ * script's isolated world (e.g. pushState called by the page's main world).
+ * Compares pathname only — query/hash changes don't affect route gating.
+ */
+function watchUrlChanges(
+  onNavigate: () => void,
+): ReturnType<typeof setInterval> {
+  let lastPathname = location.pathname;
+  return setInterval(() => {
+    if (location.pathname !== lastPathname) {
+      lastPathname = location.pathname;
+      onNavigate();
+    }
+  }, 500);
+}
+
+function debounce(fn: () => void, delayMs: number): CancellableCallback {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  return () => {
+
+  const invoke = () => {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(fn, delayMs);
+    timer = setTimeout(() => {
+      timer = null;
+      fn();
+    }, delayMs);
   };
+
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  return Object.assign(invoke, { cancel }) as CancellableCallback;
 }
