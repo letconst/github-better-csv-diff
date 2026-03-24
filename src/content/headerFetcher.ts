@@ -114,6 +114,10 @@ function parseFirstRow(text: string): string[] | null {
   });
 
   if (result.errors.length > 0) {
+    console.warn(
+      "[GitHub Better CSV Diff] Header parse errors:",
+      result.errors,
+    );
     return null;
   }
 

@@ -364,6 +364,8 @@ function resolveFinalMode(
 ): SideHeaderMode {
   if (!needsHeader) return { mode: "default" };
 
+  // If own fetch failed (null), fall back to other side's fetched header.
+  // This handles Classic UI (baseRef unavailable) and fetch errors gracefully.
   const resolvedHeader = ownHeader ?? otherHeader;
   if (resolvedHeader) {
     return { mode: "external", headers: resolvedHeader };

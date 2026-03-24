@@ -129,8 +129,10 @@ function parseOwnerRepo(): { owner: string; repo: string } | null {
 }
 
 function extractUrlParam(url: string, param: string): string | null {
-  const match = url.match(new RegExp(`[?&]${param}=([^&]+)`));
-  return match ? decodeURIComponent(match[1]) : null;
+  const queryStart = url.indexOf("?");
+  if (queryStart === -1) return null;
+  const params = new URLSearchParams(url.slice(queryStart));
+  return params.get(param);
 }
 
 /** Extract commit sha from standalone commit URL like /owner/repo/commit/:sha */
@@ -160,13 +162,14 @@ function extractCommitRefs(): {
         ? commit.parents[0]
         : null;
 
-    return {
-      baseRef:
-        typeof firstParent === "string"
-          ? firstParent
-          : (firstParent?.oid ?? null),
-      headRef: commit.oid ?? null,
-    };
+    const baseRef =
+      typeof firstParent === "string"
+        ? firstParent
+        : (firstParent?.oid ?? null);
+    const headRef = commit.oid ?? null;
+    // Return null if both refs are empty so ?? fallback chains work
+    if (!baseRef && !headRef) return null;
+    return { baseRef, headRef };
   });
 }
 
