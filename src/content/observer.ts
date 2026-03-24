@@ -4,9 +4,23 @@
  * Supports PR pages, commit pages, and both Preview UI and Classic UI.
  */
 
-import { diffToCsv, extractDiffLinesFromDom } from "../parser/diffParser";
+import type { CsvDiff } from "../parser/diffParser";
+import {
+  diffToCsv,
+  extractDiffLinesFromDom,
+  getFirstLineNumbers,
+} from "../parser/diffParser";
 import { CLASSIC_UI, PREVIEW_UI, type UiConfig } from "../parser/uiConfig";
-import { renderDiffTable } from "../renderer/tableRenderer";
+import {
+  type RenderOptions,
+  renderDiffTable,
+  type SideHeaderMode,
+} from "../renderer/tableRenderer";
+import { clearHeaderCache, fetchCsvHeaderRow } from "./headerFetcher";
+import {
+  clearRevisionContextCache,
+  getRevisionContext,
+} from "./revisionContext";
 import { isDiffRoute } from "./routes";
 
 type CancellableCallback = MutationCallback & { cancel: () => void };
@@ -70,6 +84,9 @@ function disconnectObserver(): void {
   // Cancel pending debounce even if observer is already null (fully idempotent)
   debouncedCallback?.cancel();
   debouncedCallback = null;
+  // Clear cached revision context and header cache on navigation
+  clearRevisionContextCache();
+  clearHeaderCache();
   if (!observer) return;
   observer.disconnect();
   observer = null;
@@ -156,11 +173,57 @@ function processCsvDiffBlock(
       return;
     }
 
+    const { firstBeforeLine, firstAfterLine } = getFirstLineNumbers(diffLines);
     const csvDiff = diffToCsv(diffLines);
-    const tableElement = renderDiffTable(csvDiff);
-    if (injectTableOverlay(container, tableElement, config)) {
-      container.setAttribute(PROCESSED_ATTR, "true");
+
+    const needsBeforeHeader = firstBeforeLine !== null && firstBeforeLine !== 1;
+    const needsAfterHeader = firstAfterLine !== null && firstAfterLine !== 1;
+
+    if (!needsBeforeHeader && !needsAfterHeader) {
+      // No header fetch needed — render as before
+      const tableElement = renderDiffTable(csvDiff);
+      if (injectTableOverlay(container, tableElement, config)) {
+        container.setAttribute(PROCESSED_ATTR, "true");
+      }
+      return;
     }
+
+    // At least one side needs a fetched header
+    const ctx = getRevisionContext();
+    const willFetchBefore = needsBeforeHeader && Boolean(ctx?.baseRef);
+    const willFetchAfter = needsAfterHeader && Boolean(ctx?.headRef);
+    const options = buildInitialRenderOptions(
+      csvDiff,
+      needsBeforeHeader,
+      needsAfterHeader,
+      willFetchBefore,
+      willFetchAfter,
+    );
+    const tableElement = renderDiffTable(csvDiff, options);
+    if (!injectTableOverlay(container, tableElement, config)) return;
+    container.setAttribute(PROCESSED_ATTR, "true");
+
+    if (!willFetchBefore && !willFetchAfter) {
+      return;
+    }
+
+    // Async fetch headers and re-render
+    const wrapper = container.querySelector(".csv-diff-wrapper");
+    if (!wrapper || !ctx) return;
+
+    fetchAndRerender({
+      wrapper: wrapper as HTMLElement,
+      csvDiff,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      baseRef: ctx.baseRef,
+      headRef: ctx.headRef,
+      filepath: filename,
+      willFetchBefore,
+      willFetchAfter,
+      needsBeforeHeader,
+      needsAfterHeader,
+    });
   } catch (error) {
     console.error(
       "[GitHub Better CSV Diff] Error processing diff block:",
@@ -168,6 +231,148 @@ function processCsvDiffBlock(
       error,
     );
   }
+}
+
+function buildInitialRenderOptions(
+  csvDiff: CsvDiff,
+  needsBeforeHeader: boolean,
+  needsAfterHeader: boolean,
+  willFetchBefore: boolean,
+  willFetchAfter: boolean,
+): RenderOptions {
+  // When a side doesn't need fetching, its first row can serve as a fallback
+  // header for the other side (which does need fetching but can't).
+  const fallbackFromBefore = !needsBeforeHeader
+    ? (csvDiff.before[0] ?? null)
+    : null;
+  const fallbackFromAfter = !needsAfterHeader
+    ? (csvDiff.after[0] ?? null)
+    : null;
+
+  return {
+    before: determineInitialSideMode(
+      needsBeforeHeader,
+      willFetchBefore,
+      willFetchAfter,
+      fallbackFromAfter,
+    ),
+    after: determineInitialSideMode(
+      needsAfterHeader,
+      willFetchAfter,
+      willFetchBefore,
+      fallbackFromBefore,
+    ),
+  };
+}
+
+function determineInitialSideMode(
+  needsHeader: boolean,
+  willFetch: boolean,
+  otherSideWillFetch: boolean,
+  fallbackHeader: string[] | null,
+): SideHeaderMode {
+  if (!needsHeader) return { mode: "default" };
+  if (willFetch || otherSideWillFetch) return { mode: "loading" };
+  if (fallbackHeader) return { mode: "external", headers: fallbackHeader };
+  return { mode: "default" };
+}
+
+interface FetchAndRerenderParams {
+  wrapper: HTMLElement;
+  csvDiff: CsvDiff;
+  owner: string;
+  repo: string;
+  baseRef: string | null;
+  headRef: string | null;
+  filepath: string;
+  willFetchBefore: boolean;
+  willFetchAfter: boolean;
+  needsBeforeHeader: boolean;
+  needsAfterHeader: boolean;
+}
+
+async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
+  const {
+    wrapper,
+    csvDiff,
+    owner,
+    repo,
+    baseRef,
+    headRef,
+    filepath,
+    willFetchBefore,
+    willFetchAfter,
+    needsBeforeHeader,
+    needsAfterHeader,
+  } = params;
+
+  try {
+    const [beforeHeader, afterHeader] = await Promise.all([
+      willFetchBefore && baseRef
+        ? fetchCsvHeaderRow(owner, repo, baseRef, filepath)
+        : Promise.resolve(null),
+      willFetchAfter && headRef
+        ? fetchCsvHeaderRow(owner, repo, headRef, filepath)
+        : Promise.resolve(null),
+    ]);
+
+    if (!wrapper.isConnected) return;
+
+    const newTable = renderDiffTable(
+      csvDiff,
+      buildFinalRenderOptions(
+        needsBeforeHeader,
+        needsAfterHeader,
+        beforeHeader,
+        afterHeader,
+      ),
+    );
+
+    const oldContainer = wrapper.querySelector(".csv-diff-container");
+    if (oldContainer) {
+      oldContainer.replaceWith(newTable);
+    }
+  } catch (error) {
+    console.warn(
+      "[GitHub Better CSV Diff] Header fetch/rerender failed:",
+      filepath,
+      error,
+    );
+  }
+}
+
+function buildFinalRenderOptions(
+  needsBeforeHeader: boolean,
+  needsAfterHeader: boolean,
+  beforeHeader: string[] | null,
+  afterHeader: string[] | null,
+): RenderOptions {
+  return {
+    before: resolveFinalMode(needsBeforeHeader, beforeHeader, afterHeader),
+    after: resolveFinalMode(needsAfterHeader, afterHeader, beforeHeader),
+  };
+}
+
+/**
+ * Determine the final SideHeaderMode after fetch resolution.
+ * Priority: own fetched header > other side's header as fallback > default mode.
+ * Falls back to "default" (diff[0] as header) only when neither side succeeded,
+ * to avoid duplicating diff[0] in both header and body.
+ */
+function resolveFinalMode(
+  needsHeader: boolean,
+  ownHeader: string[] | null,
+  otherHeader: string[] | null,
+): SideHeaderMode {
+  if (!needsHeader) return { mode: "default" };
+
+  // If own fetch failed (null), fall back to other side's fetched header.
+  // This handles Classic UI (baseRef unavailable) and fetch errors gracefully.
+  const resolvedHeader = ownHeader ?? otherHeader;
+  if (resolvedHeader) {
+    return { mode: "external", headers: resolvedHeader };
+  }
+  return { mode: "default" };
 }
 
 /** Find the actions area in the header, with fallback for Preview UI. */
@@ -184,16 +389,37 @@ function findActionsArea(
     return viewedBtn.parentElement;
   }
 
-  // Fallback for commit page: locate via "More options" button's parent container
-  const moreBtn = header.querySelector<HTMLElement>(
-    'button[aria-label="More options"]',
-  );
+  // Fallback for commit page: locate via "More options" button's parent container.
+  // The button may use aria-label or aria-labelledby (PR commit pages use the latter).
+  const moreBtn =
+    header.querySelector<HTMLElement>('button[aria-label="More options"]') ??
+    findButtonByTooltipText(header, "More options");
   if (moreBtn?.parentElement) {
     return moreBtn.parentElement;
   }
 
   // Fallback for Classic UI: use .file-actions container directly
   return header.querySelector<HTMLElement>(".file-actions");
+}
+
+/** Find a button whose aria-labelledby tooltip contains the given text. */
+function findButtonByTooltipText(
+  container: HTMLElement,
+  text: string,
+): HTMLElement | null {
+  const buttons = container.querySelectorAll<HTMLElement>(
+    "button[aria-labelledby]",
+  );
+  for (const btn of buttons) {
+    const labelIds = btn.getAttribute("aria-labelledby");
+    if (!labelIds) continue;
+    // aria-labelledby can contain multiple space-separated IDs
+    for (const id of labelIds.split(/\s+/)) {
+      const label = document.getElementById(id);
+      if (label?.textContent?.trim() === text) return btn;
+    }
+  }
+  return null;
 }
 
 function createToggleButton(): HTMLButtonElement {

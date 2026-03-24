@@ -19,6 +19,35 @@ export interface CsvDiff {
   afterLineNumbers: Array<number | null>;
 }
 
+/**
+ * Detect the first before/after line numbers from raw DiffLine[].
+ * Must be called BEFORE CSV parsing, since parseCsv() may drop empty lines
+ * and diffToCsv() may null out mismatched line numbers.
+ */
+export function getFirstLineNumbers(lines: DiffLine[]): {
+  firstBeforeLine: number | null;
+  firstAfterLine: number | null;
+} {
+  let firstBeforeLine: number | null = null;
+  let firstAfterLine: number | null = null;
+  for (const line of lines) {
+    if (
+      firstBeforeLine === null &&
+      (line.type === "removed" || line.type === "unchanged")
+    ) {
+      firstBeforeLine = line.oldLineNumber;
+    }
+    if (
+      firstAfterLine === null &&
+      (line.type === "added" || line.type === "unchanged")
+    ) {
+      firstAfterLine = line.newLineNumber;
+    }
+    if (firstBeforeLine !== null && firstAfterLine !== null) break;
+  }
+  return { firstBeforeLine, firstAfterLine };
+}
+
 export function parseUnifiedDiff(diffText: string): DiffLine[] {
   const lines = diffText.split("\n");
   const result: DiffLine[] = [];

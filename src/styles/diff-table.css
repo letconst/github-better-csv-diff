@@ -85,6 +85,14 @@
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
 }
 
+/* Loading placeholder for header fetch */
+.csv-diff-loading {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--fgColor-muted, #636c76);
+  text-align: center;
+}
+
 /* Toggle button */
 .csv-diff-toggle-btn {
   margin-right: 8px;

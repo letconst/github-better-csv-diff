@@ -17,36 +17,109 @@ export interface MatchedRow {
   afterLineNumber: number | null;
 }
 
-export function renderDiffTable(diff: CsvDiff): HTMLElement {
+export interface SideHeaderMode {
+  mode: "default" | "external" | "loading";
+  /** Header row to display. Required when mode is "external". */
+  headers?: string[];
+}
+
+export interface RenderOptions {
+  before?: SideHeaderMode;
+  after?: SideHeaderMode;
+}
+
+/**
+ * Resolve header and data arrays for one side based on the header mode.
+ * - "default": diff[0] = header, diff[1..] = data (current behavior)
+ * - "external": provided headers, diff[0..] = data (all rows are data)
+ * - "loading": placeholder header, diff[0..] = data (all rows are data)
+ */
+function resolveHeaderAndData(
+  diffRows: string[][],
+  lineNumbers: Array<number | null>,
+  mode?: SideHeaderMode,
+): {
+  headers: string[];
+  data: string[][];
+  lineNums: Array<number | null>;
+  isLoading: boolean;
+} {
+  if (!mode || mode.mode === "default") {
+    return {
+      headers: diffRows[0] ?? [],
+      data: diffRows.slice(1),
+      lineNums: lineNumbers.slice(1),
+      isLoading: false,
+    };
+  }
+  if (mode.mode === "external") {
+    return {
+      headers: mode.headers ?? [],
+      data: diffRows,
+      lineNums: lineNumbers,
+      isLoading: false,
+    };
+  }
+  // loading
+  return {
+    headers: [],
+    data: diffRows,
+    lineNums: lineNumbers,
+    isLoading: true,
+  };
+}
+
+export function renderDiffTable(
+  diff: CsvDiff,
+  options?: RenderOptions,
+): HTMLElement {
   const container = document.createElement("div");
   container.className = "csv-diff-container";
 
-  const beforeHeaders = diff.before[0] ?? [];
-  const afterHeaders = diff.after[0] ?? [];
-  const beforeData = diff.before.slice(1);
-  const afterData = diff.after.slice(1);
-  const beforeLineNums = diff.beforeLineNumbers.slice(1);
-  const afterLineNums = diff.afterLineNumbers.slice(1);
+  const before = resolveHeaderAndData(
+    diff.before,
+    diff.beforeLineNumbers,
+    options?.before,
+  );
+  const after = resolveHeaderAndData(
+    diff.after,
+    diff.afterLineNumbers,
+    options?.after,
+  );
 
   const maxCols = Math.max(
-    beforeHeaders.length,
-    afterHeaders.length,
-    ...beforeData.map((row) => row.length),
-    ...afterData.map((row) => row.length),
+    before.headers.length,
+    after.headers.length,
+    ...before.data.map((row) => row.length),
+    ...after.data.map((row) => row.length),
   );
 
   const matched = matchRows(
-    beforeData,
-    afterData,
-    beforeLineNums,
-    afterLineNums,
+    before.data,
+    after.data,
+    before.lineNums,
+    after.lineNums,
   );
 
   container.appendChild(
-    buildSide("Before", beforeHeaders, matched, "before", maxCols),
+    buildSide(
+      "Before",
+      before.headers,
+      matched,
+      "before",
+      maxCols,
+      before.isLoading,
+    ),
   );
   container.appendChild(
-    buildSide("After", afterHeaders, matched, "after", maxCols),
+    buildSide(
+      "After",
+      after.headers,
+      matched,
+      "after",
+      maxCols,
+      after.isLoading,
+    ),
   );
 
   highlightChangedCells(container, matched);
@@ -75,6 +148,7 @@ function buildSide(
   matched: MatchedRow[],
   side: "before" | "after",
   maxCols: number,
+  isLoading = false,
 ): HTMLElement {
   const sideDiv = document.createElement("div");
   sideDiv.className = "csv-diff-side";
@@ -88,16 +162,25 @@ function buildSide(
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
 
-  // Line number header cell
-  const lineNumTh = document.createElement("th");
-  lineNumTh.className = "csv-diff-line-num";
-  lineNumTh.textContent = "#";
-  headerRow.appendChild(lineNumTh);
-
-  for (let i = 0; i < maxCols; i++) {
+  if (isLoading) {
+    // Loading placeholder: single cell spanning all columns (line-num + data cols)
     const th = document.createElement("th");
-    th.textContent = i < headers.length ? headers[i] : "";
+    th.colSpan = maxCols + 1; // +1 for line number column
+    th.textContent = "Loading...";
+    th.className = "csv-diff-loading";
     headerRow.appendChild(th);
+  } else {
+    // Line number header cell
+    const lineNumTh = document.createElement("th");
+    lineNumTh.className = "csv-diff-line-num";
+    lineNumTh.textContent = "#";
+    headerRow.appendChild(lineNumTh);
+
+    for (let i = 0; i < maxCols; i++) {
+      const th = document.createElement("th");
+      th.textContent = i < headers.length ? headers[i] : "";
+      headerRow.appendChild(th);
+    }
   }
   thead.appendChild(headerRow);
   table.appendChild(thead);
