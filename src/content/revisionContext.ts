@@ -194,10 +194,11 @@ function extractPreviewPrRefs(): {
         | undefined;
       const diff = comparison?.fullDiff as Record<string, unknown> | undefined;
       if (!diff) return null;
-      return {
-        baseRef: (diff.baseOid as string) ?? null,
-        headRef: (diff.headOid as string) ?? null,
-      };
+      const baseRef = typeof diff.baseOid === "string" ? diff.baseOid : null;
+      const headRef = typeof diff.headOid === "string" ? diff.headOid : null;
+      // Return null if both refs are empty so ?? fallback chains work
+      if (!baseRef && !headRef) return null;
+      return { baseRef, headRef };
     });
     if (refs) return refs;
   }
