@@ -243,9 +243,11 @@ function buildInitialRenderOptions(
   // When a side doesn't need fetching, its first row can serve as a fallback
   // header for the other side (which does need fetching but can't).
   const fallbackFromBefore = !needsBeforeHeader
-    ? (csvDiff.before[0] ?? [])
+    ? (csvDiff.before[0] ?? null)
     : null;
-  const fallbackFromAfter = !needsAfterHeader ? (csvDiff.after[0] ?? []) : null;
+  const fallbackFromAfter = !needsAfterHeader
+    ? (csvDiff.after[0] ?? null)
+    : null;
 
   return {
     before: determineInitialSideMode(
