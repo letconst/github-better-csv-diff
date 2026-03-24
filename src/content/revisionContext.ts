@@ -246,8 +246,12 @@ function extractFromEmbeddedJson<T>(
       if (!payload) continue;
       const result = extractor(payload);
       if (result) return result;
-    } catch {
-      // Not valid JSON or wrong structure — continue searching
+    } catch (error) {
+      console.warn(
+        "[GitHub Better CSV Diff] Failed to parse embedded revision JSON:",
+        markerKey,
+        error,
+      );
     }
   }
   return null;
