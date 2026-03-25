@@ -16,11 +16,19 @@ GitHub's default diff view shows CSV changes as raw text, making it hard to see 
 
 ## Screenshots
 
-<!-- TODO: Add screenshots -->
+![Screenshot 1](docs/images/screenshot-1.png)
+
+![Screenshot 2](docs/images/screenshot-2.png)
 
 ## Install
 
-<!-- TODO: Add store links -->
+> [![Chrome Web Store](docs/images/badge-chrome.png)](https://chromewebstore.google.com/detail/jmfogejgalnkpocgepneniogiajbiinc)
+>
+> [![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/jmfogejgalnkpocgepneniogiajbiinc)](https://chromewebstore.google.com/detail/jmfogejgalnkpocgepneniogiajbiinc)
+
+> [![Firefox Add-on](docs/images/badge-firefox.png)](https://addons.mozilla.org/firefox/addon/github-better-csv-diff/)
+>
+> [![Firefox Add-on Version](https://img.shields.io/amo/v/github-better-csv-diff)](https://addons.mozilla.org/firefox/addon/github-better-csv-diff/)
 
 ## Development
 
