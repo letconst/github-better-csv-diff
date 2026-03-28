@@ -2,7 +2,7 @@
  * Parses unified diff text extracted from GitHub DOM into structured diff data.
  */
 
-import { parseCsv } from "./csvParser";
+import { parseCsvWithLineMap } from "./csvParser";
 import type { UiConfig } from "./uiConfig";
 
 export interface DiffLine {
@@ -21,8 +21,8 @@ export interface CsvDiff {
 
 /**
  * Detect the first before/after line numbers from raw DiffLine[].
- * Must be called BEFORE CSV parsing, since parseCsv() may drop empty lines
- * and diffToCsv() may null out mismatched line numbers.
+ * Must be called BEFORE CSV parsing, since CSV parsing may drop empty lines
+ * or merge multiline quoted fields, changing row counts.
  */
 export function getFirstLineNumbers(lines: DiffLine[]): {
   firstBeforeLine: number | null;
@@ -95,20 +95,14 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     }
   }
 
-  const before = parseCsv(beforeLines.join("\n"));
-  const after = parseCsv(afterLines.join("\n"));
+  const before = parseCsvWithLineMap(beforeLines, beforeLineNumbers);
+  const after = parseCsvWithLineMap(afterLines, afterLineNumbers);
 
   return {
-    before,
-    after,
-    beforeLineNumbers:
-      before.length === beforeLineNumbers.length
-        ? beforeLineNumbers
-        : Array(before.length).fill(null),
-    afterLineNumbers:
-      after.length === afterLineNumbers.length
-        ? afterLineNumbers
-        : Array(after.length).fill(null),
+    before: before.data,
+    after: after.data,
+    beforeLineNumbers: before.lineNumbers,
+    afterLineNumbers: after.lineNumbers,
   };
 }
 
