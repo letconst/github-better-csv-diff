@@ -75,6 +75,7 @@ function setTextWithBreaks(parent: HTMLElement, text: string): void {
     parent.textContent = text;
     return;
   }
+  parent.textContent = "";
   appendTextWithBreaks(parent, text, true);
 }
 
