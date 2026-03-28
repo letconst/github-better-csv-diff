@@ -69,6 +69,53 @@ function resolveHeaderAndData(
   };
 }
 
+function setTextWithBreaks(parent: HTMLElement, text: string): void {
+  if (!text.includes("\n") && !text.includes("\r")) {
+    parent.textContent = text;
+    return;
+  }
+  const parts = text.replace(/\r\n?/g, "\n").split("\n");
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) parent.appendChild(document.createElement("br"));
+    parent.appendChild(document.createTextNode(parts[i]));
+  }
+}
+
+export function syncRowHeights(container: HTMLElement): void {
+  if (!container.isConnected || !container.getClientRects().length) return;
+
+  const tables = container.querySelectorAll<HTMLTableElement>(
+    ".csv-diff-side table",
+  );
+  if (tables.length !== 2) return;
+
+  const beforeRows = tables[0].querySelectorAll<HTMLTableRowElement>("tr");
+  const afterRows = tables[1].querySelectorAll<HTMLTableRowElement>("tr");
+  const len = Math.min(beforeRows.length, afterRows.length);
+
+  // Clear pass
+  for (let i = 0; i < len; i++) {
+    beforeRows[i].style.height = "";
+    afterRows[i].style.height = "";
+  }
+
+  // Read pass — collect natural heights
+  const heights: number[] = new Array(len);
+  for (let i = 0; i < len; i++) {
+    heights[i] = Math.max(
+      beforeRows[i].offsetHeight,
+      afterRows[i].offsetHeight,
+    );
+  }
+
+  // Write pass — apply heights
+  for (let i = 0; i < len; i++) {
+    const h = `${heights[i]}px`;
+    beforeRows[i].style.height = h;
+    afterRows[i].style.height = h;
+  }
+}
+
 export function renderDiffTable(
   diff: CsvDiff,
   options?: RenderOptions,
@@ -178,7 +225,7 @@ function buildSide(
 
     for (let i = 0; i < maxCols; i++) {
       const th = document.createElement("th");
-      th.textContent = i < headers.length ? headers[i] : "";
+      setTextWithBreaks(th, i < headers.length ? headers[i] : "");
       headerRow.appendChild(th);
     }
   }
@@ -214,7 +261,7 @@ function buildSide(
       if (isEmpty) {
         td.textContent = "\u00A0";
       } else {
-        td.textContent = i < row.length ? row[i] : "";
+        setTextWithBreaks(td, i < row.length ? row[i] : "");
       }
       tr.appendChild(td);
     }

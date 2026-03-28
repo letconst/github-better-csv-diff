@@ -32,6 +32,7 @@
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
   border-right: 1px solid var(--borderColor-muted, #eaeef2);
   font-weight: 600;
+  vertical-align: top;
 }
 
 .csv-diff-side td {
@@ -39,6 +40,7 @@
   border-bottom: 1px solid var(--borderColor-muted, #eaeef2);
   border-right: 1px solid var(--borderColor-muted, #eaeef2);
   white-space: nowrap;
+  vertical-align: top;
 }
 
 .csv-diff-side th:last-child,

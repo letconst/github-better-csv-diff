@@ -15,6 +15,7 @@ import {
   type RenderOptions,
   renderDiffTable,
   type SideHeaderMode,
+  syncRowHeights,
 } from "../renderer/tableRenderer";
 import { clearHeaderCache, fetchCsvHeaderRow } from "./headerFetcher";
 import {
@@ -331,6 +332,7 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     const oldContainer = wrapper.querySelector(".csv-diff-container");
     if (oldContainer) {
       oldContainer.replaceWith(newTable);
+      syncRowHeights(newTable);
     }
   } catch (error) {
     console.warn(
@@ -499,6 +501,13 @@ function injectTableOverlay(
     toggleBtn.classList.toggle("csv-diff-toggle-active", !isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
+    // Re-sync row heights when toggling back to table view
+    if (!isTableVisible) {
+      const currentTable = wrapper.querySelector<HTMLElement>(
+        ".csv-diff-container",
+      );
+      if (currentTable) syncRowHeights(currentTable);
+    }
   });
 
   insertToggleButton(header, config, toggleBtn);
@@ -506,6 +515,7 @@ function injectTableOverlay(
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(false);
   diffBody.prepend(wrapper);
+  syncRowHeights(tableElement);
   return true;
 }
 
