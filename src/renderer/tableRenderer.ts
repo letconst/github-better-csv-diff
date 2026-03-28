@@ -4,6 +4,7 @@
 
 import type { CsvDiff } from "../parser/diffParser";
 import {
+  appendTextWithBreaks,
   computeInlineDiff,
   renderInlineAfter,
   renderInlineBefore,
@@ -74,11 +75,8 @@ function setTextWithBreaks(parent: HTMLElement, text: string): void {
     parent.textContent = text;
     return;
   }
-  const parts = text.replace(/\r\n?/g, "\n").split("\n");
-  for (let i = 0; i < parts.length; i++) {
-    if (i > 0) parent.appendChild(document.createElement("br"));
-    parent.appendChild(document.createTextNode(parts[i]));
-  }
+  parent.textContent = "";
+  appendTextWithBreaks(parent, text, true);
 }
 
 export function syncRowHeights(container: HTMLElement): void {

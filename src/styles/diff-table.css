@@ -80,6 +80,18 @@
   padding: 1px 0;
 }
 
+.csv-diff-newline-indicator {
+  display: inline-block;
+  margin-left: 2px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.csv-diff-newline-indicator::before {
+  content: "↵";
+  opacity: 0.5;
+}
+
 .csv-diff-header {
   padding: 6px 10px;
   font-weight: 600;
