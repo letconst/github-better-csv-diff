@@ -42,18 +42,63 @@ export function computeInlineDiff(
   return null;
 }
 
-function appendTextWithBreaks(
+function createNewlineIndicator(extraClass?: string): HTMLSpanElement {
+  const indicator = document.createElement("span");
+  indicator.className = extraClass
+    ? `csv-diff-newline-indicator ${extraClass}`
+    : "csv-diff-newline-indicator";
+  indicator.setAttribute("aria-hidden", "true");
+  return indicator;
+}
+
+function splitLines(text: string): string[] {
+  return text.replace(/\r\n?/g, "\n").split("\n");
+}
+
+function containsNewline(text: string): boolean {
+  return text.includes("\n") || text.includes("\r");
+}
+
+export function appendTextWithBreaks(
   parent: DocumentFragment | HTMLElement,
   text: string,
+  showIndicator = false,
 ): void {
-  if (!text.includes("\n") && !text.includes("\r")) {
+  if (!containsNewline(text)) {
     parent.appendChild(document.createTextNode(text));
     return;
   }
-  const parts = text.replace(/\r\n?/g, "\n").split("\n");
+  const parts = splitLines(text);
   for (let i = 0; i < parts.length; i++) {
-    if (i > 0) parent.appendChild(document.createElement("br"));
+    if (i > 0) {
+      if (showIndicator) {
+        parent.appendChild(createNewlineIndicator());
+      }
+      parent.appendChild(document.createElement("br"));
+    }
     parent.appendChild(document.createTextNode(parts[i]));
+  }
+}
+
+/**
+ * Appends highlighted text segments to a fragment, splitting by newlines so
+ * that newline indicators and <br> elements sit outside the highlight spans.
+ */
+function appendHighlightedWithBreaks(
+  fragment: DocumentFragment,
+  text: string,
+  className: string,
+): void {
+  const parts = splitLines(text);
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) {
+      fragment.appendChild(createNewlineIndicator(className));
+      fragment.appendChild(document.createElement("br"));
+    }
+    const span = document.createElement("span");
+    span.className = className;
+    span.appendChild(document.createTextNode(parts[i]));
+    fragment.appendChild(span);
   }
 }
 
@@ -67,12 +112,13 @@ export function renderInlineBefore(changes: Change[]): DocumentFragment {
   for (const change of changes) {
     if (change.added) continue;
     if (change.removed) {
-      const span = document.createElement("span");
-      span.className = "csv-diff-inline-removed";
-      appendTextWithBreaks(span, change.value);
-      fragment.appendChild(span);
+      appendHighlightedWithBreaks(
+        fragment,
+        change.value,
+        "csv-diff-inline-removed",
+      );
     } else {
-      appendTextWithBreaks(fragment, change.value);
+      appendTextWithBreaks(fragment, change.value, true);
     }
   }
 
@@ -89,12 +135,13 @@ export function renderInlineAfter(changes: Change[]): DocumentFragment {
   for (const change of changes) {
     if (change.removed) continue;
     if (change.added) {
-      const span = document.createElement("span");
-      span.className = "csv-diff-inline-added";
-      appendTextWithBreaks(span, change.value);
-      fragment.appendChild(span);
+      appendHighlightedWithBreaks(
+        fragment,
+        change.value,
+        "csv-diff-inline-added",
+      );
     } else {
-      appendTextWithBreaks(fragment, change.value);
+      appendTextWithBreaks(fragment, change.value, true);
     }
   }
 
