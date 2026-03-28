@@ -21,8 +21,8 @@ export interface CsvDiff {
 
 /**
  * Detect the first before/after line numbers from raw DiffLine[].
- * Must be called BEFORE CSV parsing, since parseCsv() may drop empty lines
- * and diffToCsv() may null out mismatched line numbers.
+ * Must be called BEFORE CSV parsing, since CSV parsing may drop empty lines
+ * or merge multiline quoted fields, changing row counts.
  */
 export function getFirstLineNumbers(lines: DiffLine[]): {
   firstBeforeLine: number | null;
