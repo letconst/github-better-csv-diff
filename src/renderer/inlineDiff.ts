@@ -42,6 +42,21 @@ export function computeInlineDiff(
   return null;
 }
 
+function appendTextWithBreaks(
+  parent: DocumentFragment | HTMLElement,
+  text: string,
+): void {
+  if (!text.includes("\n") && !text.includes("\r")) {
+    parent.appendChild(document.createTextNode(text));
+    return;
+  }
+  const parts = text.replace(/\r\n?/g, "\n").split("\n");
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) parent.appendChild(document.createElement("br"));
+    parent.appendChild(document.createTextNode(parts[i]));
+  }
+}
+
 /**
  * Builds DOM nodes for a "before" (deletion) cell with inline diff spans.
  * Removed segments are wrapped in <span class="csv-diff-inline-removed">.
@@ -54,10 +69,10 @@ export function renderInlineBefore(changes: Change[]): DocumentFragment {
     if (change.removed) {
       const span = document.createElement("span");
       span.className = "csv-diff-inline-removed";
-      span.textContent = change.value;
+      appendTextWithBreaks(span, change.value);
       fragment.appendChild(span);
     } else {
-      fragment.appendChild(document.createTextNode(change.value));
+      appendTextWithBreaks(fragment, change.value);
     }
   }
 
@@ -76,10 +91,10 @@ export function renderInlineAfter(changes: Change[]): DocumentFragment {
     if (change.added) {
       const span = document.createElement("span");
       span.className = "csv-diff-inline-added";
-      span.textContent = change.value;
+      appendTextWithBreaks(span, change.value);
       fragment.appendChild(span);
     } else {
-      fragment.appendChild(document.createTextNode(change.value));
+      appendTextWithBreaks(fragment, change.value);
     }
   }
 
