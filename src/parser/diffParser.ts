@@ -2,7 +2,7 @@
  * Parses unified diff text extracted from GitHub DOM into structured diff data.
  */
 
-import { parseCsv } from "./csvParser";
+import { parseCsvWithLineMap } from "./csvParser";
 import type { UiConfig } from "./uiConfig";
 
 export interface DiffLine {
@@ -95,20 +95,14 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     }
   }
 
-  const before = parseCsv(beforeLines.join("\n"));
-  const after = parseCsv(afterLines.join("\n"));
+  const before = parseCsvWithLineMap(beforeLines, beforeLineNumbers);
+  const after = parseCsvWithLineMap(afterLines, afterLineNumbers);
 
   return {
-    before,
-    after,
-    beforeLineNumbers:
-      before.length === beforeLineNumbers.length
-        ? beforeLineNumbers
-        : Array(before.length).fill(null),
-    afterLineNumbers:
-      after.length === afterLineNumbers.length
-        ? afterLineNumbers
-        : Array(after.length).fill(null),
+    before: before.data,
+    after: after.data,
+    beforeLineNumbers: before.lineNumbers,
+    afterLineNumbers: after.lineNumbers,
   };
 }
 
