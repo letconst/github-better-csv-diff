@@ -1,0 +1,11 @@
+id,name,description,tags,note
+1,Alpha,"First line
+Second line",tag-a,simple
+2,Beta,"Contains ""quoted"" text",tag-b,
+3,Gamma,"Has, commas, inside",tag-c,normal
+4,Delta,"Multi
+line
+content","tag-d, tag-e",complex
+5,Epsilon,Plain text,tag-f,basic
+6,Zeta,"Line one
+Line two","tag-g, tag-h",

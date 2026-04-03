@@ -1,0 +1,46 @@
+record_id,city,country,population,area_km2,timezone,founded_year
+R001,Tokyo,Japan,13960000,2194,Asia/Tokyo,1457
+R002,Osaka,Japan,2753000,225,Asia/Tokyo,1583
+R003,Yokohama,Japan,3749000,437,Asia/Tokyo,1859
+R004,Nagoya,Japan,2320000,326,Asia/Tokyo,1610
+R005,Sapporo,Japan,1973000,1121,Asia/Tokyo,1868
+R006,Fukuoka,Japan,1603000,343,Asia/Tokyo,1889
+R007,Kobe,Japan,1525000,557,Asia/Tokyo,1889
+R008,Kyoto,Japan,1464000,827,Asia/Tokyo,794
+R009,Kawasaki,Japan,1538000,143,Asia/Tokyo,1924
+R010,Saitama,Japan,1324000,217,Asia/Tokyo,2001
+R011,New York,USA,8336000,783,America/New_York,1624
+R012,Los Angeles,USA,3979000,1302,America/Los_Angeles,1781
+R013,Chicago,USA,2693000,606,America/Chicago,1833
+R014,Houston,USA,2304000,1707,America/Chicago,1837
+R015,Phoenix,USA,1608000,1340,America/Phoenix,1881
+R016,Philadelphia,USA,1603000,369,America/New_York,1682
+R017,San Antonio,USA,1547000,1307,America/Chicago,1718
+R018,San Diego,USA,1423000,964,America/Los_Angeles,1769
+R019,Dallas,USA,1304000,999,America/Chicago,1841
+R020,San Jose,USA,1013000,467,America/Los_Angeles,1777
+R021,London,UK,8982000,1572,Europe/London,47
+R022,Birmingham,UK,1144000,267,Europe/London,1166
+R023,Manchester,UK,553000,115,Europe/London,1301
+R024,Leeds,UK,503000,551,Europe/London,1207
+R025,Glasgow,UK,633000,175,Europe/London,1175
+R026,Paris,France,2161000,105,Europe/Paris,259
+R027,Marseille,France,870000,240,Europe/Paris,600
+R028,Lyon,France,513000,47,Europe/Paris,43
+R029,Toulouse,France,493000,118,Europe/Paris,1190
+R030,Nice,France,344000,71,Europe/Paris,350
+R031,Berlin,Germany,3645000,891,Europe/Berlin,1237
+R032,Hamburg,Germany,1841000,755,Europe/Berlin,808
+R033,Munich,Germany,1472000,310,Europe/Berlin,1158
+R034,Cologne,Germany,1086000,405,Europe/Berlin,50
+R035,Frankfurt,Germany,753000,248,Europe/Berlin,794
+R036,Sydney,Australia,5312000,12367,Australia/Sydney,1788
+R037,Melbourne,Australia,5078000,9990,Australia/Melbourne,1835
+R038,Brisbane,Australia,2560000,15826,Australia/Brisbane,1824
+R039,Perth,Australia,2085000,6417,Australia/Perth,1829
+R040,Adelaide,Australia,1376000,3257,Australia/Adelaide,1836
+R041,Seoul,South Korea,9776000,605,Asia/Seoul,18
+R042,Busan,South Korea,3429000,769,Asia/Seoul,1876
+R043,Toronto,Canada,2794000,630,America/Toronto,1793
+R044,Montreal,Canada,1762000,431,America/Montreal,1642
+R045,Vancouver,Canada,662000,115,America/Vancouver,1886

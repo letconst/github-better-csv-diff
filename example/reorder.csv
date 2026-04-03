@@ -1,0 +1,9 @@
+employee_id,name,role,team,status
+E001,Tanaka,Engineer,Platform,active
+E002,Suzuki,Designer,Product,active
+E003,Yamamoto,PM,Product,active
+E004,Watanabe,Engineer,Backend,active
+E005,Ito,QA,Platform,active
+E006,Nakamura,Engineer,Frontend,active
+E007,Kobayashi,Designer,Marketing,active
+E008,Sato,PM,Backend,active
