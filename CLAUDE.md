@@ -2,18 +2,17 @@
 
 ## Overview
 
-Chrome extension that renders CSV file diffs as side-by-side tables in GitHub PR "Files changed" tabs.
+Browser extension (Chrome + Firefox) that renders CSV file diffs as side-by-side tables on GitHub (PR file reviews, commit diffs, etc.).
 
 ## Tech Stack
 
 - TypeScript (strict mode)
-- Vite + CRXJS plugin (Manifest V3)
-- Chrome Extensions API
+- WXT framework (Manifest V3, Chrome + Firefox)
 - No external UI frameworks
 
 ## Architecture
 
-- Content Script injected on `github.com/*/pull/*/files`
+- Content Script injected on `github.com/*`
 - Diff data extracted from GitHub DOM (no REST API, no auth required)
 - SPA navigation handled via MutationObserver
 - Table injected as a toggle overlay above the original diff block
@@ -22,12 +21,13 @@ Chrome extension that renders CSV file diffs as side-by-side tables in GitHub PR
 
 ```
 src/
-  content/       # Content Script entry, DOM observer, table injector
+  entrypoints/   # WXT entry points (content script)
+  content/       # DOM observer, table injector
   parser/        # CSV parser, unified diff parser
   renderer/      # Table rendering logic
   styles/        # CSS for diff table
 public/icons/    # Extension icons
-manifest.json    # Manifest V3
+wxt.config.ts    # WXT configuration (manifest + build)
 ```
 
 ## Conventions
@@ -41,11 +41,22 @@ manifest.json    # Manifest V3
 ## Build & Dev
 
 ```bash
-npm run dev      # vite build --watch
-npm run build    # production build
+npm run dev            # Chrome dev (HMR)
+npm run dev:firefox    # Firefox dev
+npm run build          # Chrome production build
+npm run build:firefox  # Firefox production build
 ```
 
-Load `dist/` as an unpacked extension in `chrome://extensions` (developer mode).
+Load `dist/chrome-mv3/` as an unpacked extension in `chrome://extensions` (developer mode).
+For Firefox, load `dist/firefox-mv2/` via `about:debugging`.
+
+## Extension Testing
+
+To verify extension behavior in the browser, use `playwright-cli open --extension` to connect to the user's running browser with the extension installed.
+
+## Plan Files
+
+- Plan files (`.claude/plans/`) should be committed as the **last commit** on the branch, after all implementation and docs commits.
 
 ## Key Decisions
 

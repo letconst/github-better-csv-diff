@@ -1,4 +1,5 @@
 ﻿reviews:
   path_filters:
+    - "**"
     - "!.claude/**"
     - "!.serena/**"

@@ -4,13 +4,12 @@
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 20px;
-  border: 1px solid var(--borderColor-default, #d0d7de);
-  border-radius: 6px;
-  margin: 8px 0;
+  color: var(--fgColor-default, #1f2328);
 }
 
 .csv-diff-side {
@@ -20,7 +19,8 @@
 
 .csv-diff-side table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .csv-diff-side th {
@@ -32,6 +32,7 @@
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
   border-right: 1px solid var(--borderColor-muted, #eaeef2);
   font-weight: 600;
+  vertical-align: top;
 }
 
 .csv-diff-side td {
@@ -39,6 +40,7 @@
   border-bottom: 1px solid var(--borderColor-muted, #eaeef2);
   border-right: 1px solid var(--borderColor-muted, #eaeef2);
   white-space: nowrap;
+  vertical-align: top;
 }
 
 .csv-diff-side th:last-child,
@@ -47,19 +49,47 @@
 }
 
 .csv-diff-row-added {
-  background: var(--diffBlob-addition-bgColor-line, #dafbe1);
+  background: var(--diffBlob-additionLine-bgColor, #dafbe1);
+  color: var(--diffBlob-additionLine-fgColor, #1f2328);
 }
 
 .csv-diff-row-removed {
-  background: var(--diffBlob-deletion-bgColor-line, #ffebe9);
+  background: var(--diffBlob-deletionLine-bgColor, #ffebe9);
+  color: var(--diffBlob-deletionLine-fgColor, #1f2328);
 }
 
 .csv-diff-cell-changed {
-  background: var(--diffBlob-addition-bgColor-word, #aceebb);
+  background: var(--diffBlob-additionLine-bgColor, #dafbe1);
+  color: var(--diffBlob-additionLine-fgColor, #1f2328);
 }
 
 .csv-diff-cell-removed {
-  background: var(--diffBlob-deletion-bgColor-word, #ffcecb);
+  background: var(--diffBlob-deletionLine-bgColor, #ffebe9);
+  color: var(--diffBlob-deletionLine-fgColor, #1f2328);
+}
+
+.csv-diff-inline-added {
+  background: var(--diffBlob-additionWord-bgColor, #abf2bc);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.csv-diff-inline-removed {
+  background: var(--diffBlob-deletionWord-bgColor, #ffcecb);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.csv-diff-newline-indicator {
+  display: inline-block;
+  margin-left: 2px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.csv-diff-newline-indicator::before {
+  content: "↵";
+  opacity: 0.5;
 }
 
 .csv-diff-header {
@@ -69,9 +99,17 @@
   border-bottom: 1px solid var(--borderColor-default, #d0d7de);
 }
 
+/* Loading placeholder for header fetch */
+.csv-diff-loading {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--fgColor-muted, #636c76);
+  text-align: center;
+}
+
 /* Toggle button */
 .csv-diff-toggle-btn {
-  margin-left: 8px;
+  margin-right: 8px;
   cursor: pointer;
 }
 
@@ -79,17 +117,67 @@
   font-weight: 600;
 }
 
-/* Wrapper for the injected table */
-.csv-diff-wrapper {
-  padding: 8px;
+/* Prevent raw diff flash when Preview UI rebuilds DOM on re-expand.
+   Hides non-wrapper children immediately via CSS, before JS re-processes. */
+[data-csv-diff-processed][role="region"]:not([data-csv-diff-raw])
+  > :nth-child(2)
+  > :not(.csv-diff-wrapper) {
+  display: none;
 }
 
 /* Empty alignment row (placeholder when row exists only on one side) */
 .csv-diff-row-empty {
-  background: var(--bgColor-muted, #f6f8fa);
+  background: var(--diffBlob-emptyLine-bgColor, var(--bgColor-muted, #f6f8fa));
 }
 
 .csv-diff-row-empty td {
   color: transparent;
   user-select: none;
+}
+
+/* Line number column */
+.csv-diff-line-num {
+  width: 1px;
+  min-width: 32px;
+  text-align: center;
+  color: var(--fgColor-muted, #636c76);
+  background: var(--bgColor-default, #ffffff);
+  user-select: none;
+  padding: 2px 6px;
+  border-right: 1px solid var(--borderColor-default, #d0d7de);
+  font-variant-numeric: tabular-nums;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+th.csv-diff-line-num {
+  background: var(--bgColor-muted, #f6f8fa);
+  padding: 4px 6px;
+  z-index: 2;
+}
+
+.csv-diff-row-added .csv-diff-line-num,
+.csv-diff-line-num-added {
+  background-color: var(--bgColor-default, #ffffff);
+  background-image: linear-gradient(
+    var(--diffBlob-additionNum-bgColor, #ccffd8),
+    var(--diffBlob-additionNum-bgColor, #ccffd8)
+  );
+  color: var(--diffBlob-additionNum-fgColor, #116329);
+}
+
+.csv-diff-row-removed .csv-diff-line-num,
+.csv-diff-line-num-removed {
+  background-color: var(--bgColor-default, #ffffff);
+  background-image: linear-gradient(
+    var(--diffBlob-deletionNum-bgColor, #ffd7d5),
+    var(--diffBlob-deletionNum-bgColor, #ffd7d5)
+  );
+  color: var(--diffBlob-deletionNum-fgColor, #82071e);
+}
+
+.csv-diff-row-empty .csv-diff-line-num {
+  background: var(--diffBlob-emptyLine-bgColor, var(--bgColor-muted, #f6f8fa));
+  color: transparent;
 }

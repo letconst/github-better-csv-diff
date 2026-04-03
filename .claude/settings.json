@@ -1,3 +1,16 @@
 ﻿{
-  "plansDirectory": ".claude/plans"
+  "plansDirectory": ".claude/plans",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/biome-fix.mjs"
+          }
+        ]
+      }
+    ]
+  }
 }

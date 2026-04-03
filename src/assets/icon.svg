@@ -1,0 +1,34 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 16px transparent padding → content in 96x96 at (16,16) -->
+  <!-- Background -->
+  <rect x="16" y="16" width="96" height="96" rx="17" fill="#f0f4f8"/>
+
+  <!-- Grid: 8px internal padding → grid area (24,24) to (104,104) = 80x80
+       3 cells × 24px + 2 gaps × 4px = 80px -->
+
+  <!-- Row 0: neutral -->
+  <rect x="24" y="24" width="24" height="24" rx="2" fill="#ffffff"/>
+  <rect x="52" y="24" width="24" height="24" rx="2" fill="#ffffff"/>
+  <rect x="80" y="24" width="24" height="24" rx="2" fill="#ffffff"/>
+
+  <!-- Row 1: add (green) -->
+  <rect x="24" y="52" width="24" height="24" rx="2" fill="#22c55e"/>
+  <rect x="52" y="52" width="24" height="24" rx="2" fill="#22c55e" opacity="0.35"/>
+  <rect x="80" y="52" width="24" height="24" rx="2" fill="#22c55e" opacity="0.35"/>
+
+  <!-- Row 2: delete (red) -->
+  <rect x="24" y="80" width="24" height="24" rx="2" fill="#ef4444"/>
+  <rect x="52" y="80" width="24" height="24" rx="2" fill="#ef4444" opacity="0.35"/>
+  <rect x="80" y="80" width="24" height="24" rx="2" fill="#ef4444" opacity="0.35"/>
+
+  <!-- Neutral row dots -->
+  <rect x="29" y="33" width="14" height="5" rx="2.5" fill="#64748b" opacity="0.45"/>
+  <rect x="57" y="33" width="14" height="5" rx="2.5" fill="#64748b" opacity="0.45"/>
+  <rect x="85" y="33" width="14" height="5" rx="2.5" fill="#64748b" opacity="0.45"/>
+
+  <!-- + indicator -->
+  <text x="36" y="68" text-anchor="middle" font-size="14" font-weight="bold" fill="#dcfce7" font-family="monospace">+</text>
+
+  <!-- − indicator -->
+  <text x="36" y="96" text-anchor="middle" font-size="14" font-weight="bold" fill="#fee2e2" font-family="monospace">−</text>
+</svg>

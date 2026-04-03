@@ -1,6 +1,8 @@
 /tmp
 /out-tsc
 /dist
+.wxt/
+.output/
 
 /node_modules
 
@@ -9,3 +11,4 @@
 .playwright-cli/*
 
 .DS_Store
+*.local.*

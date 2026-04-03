@@ -1,0 +1,9 @@
+code,name,category,price,currency,in_stock,supplier
+A001,Widget,Electronics,1200,JPY,true,Tanaka Corp
+A002,Gadget,Electronics,3500,JPY,true,Suzuki Inc
+A003,Tool Kit,Hardware,800,JPY,false,Yamamoto Ltd
+A004,Sensor,IoT,4200,JPY,true,Tanaka Corp
+A005,Display,Electronics,15000,JPY,true,Watanabe Co
+A006,Cable Set,Accessories,350,JPY,true,Ito Supply
+A007,Battery Pack,Electronics,2800,JPY,false,Suzuki Inc
+A008,Adapter,Accessories,600,JPY,true,Nakamura Parts
