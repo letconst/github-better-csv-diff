@@ -12,11 +12,19 @@ export interface DiffLine {
   newLineNumber: number | null;
 }
 
+export interface DiffAlignment {
+  type: "removed" | "added" | "unchanged";
+  oldLineNumber: number | null;
+  newLineNumber: number | null;
+}
+
 export interface CsvDiff {
   before: string[][];
   after: string[][];
   beforeLineNumbers: Array<number | null>;
   afterLineNumbers: Array<number | null>;
+  /** Diff-order alignment for rendering. One entry per diff text line. */
+  alignment: DiffAlignment[];
 }
 
 /**
@@ -103,6 +111,11 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     after: after.data,
     beforeLineNumbers: before.lineNumbers,
     afterLineNumbers: after.lineNumbers,
+    alignment: lines.map((line) => ({
+      type: line.type,
+      oldLineNumber: line.oldLineNumber,
+      newLineNumber: line.newLineNumber,
+    })),
   };
 }
 
