@@ -480,21 +480,17 @@ function tryPairBlock(
   beforeData: string[][],
   afterData: string[][],
 ): PairedToken[] {
-  // 1R/1A special case
+  // 1R/1A: always pair as modified (position-based, like GitHub split view).
+  // Adjacent removed+added in the diff are the same logical edit regardless
+  // of whether the first column changed — moved rows are separated by context.
   if (removedBlock.length === 1 && addedBlock.length === 1) {
-    const bKey = beforeData[removedBlock[0].beforeIndex!]?.[0] ?? "";
-    const aKey = afterData[addedBlock[0].afterIndex!]?.[0] ?? "";
-    // Pair unless both keys are non-empty and differ (moved row)
-    if (bKey === "" || aKey === "" || bKey === aKey) {
-      return [
-        {
-          type: "modified",
-          beforeIndex: removedBlock[0].beforeIndex,
-          afterIndex: addedBlock[0].afterIndex,
-        },
-      ];
-    }
-    return emitOriginalOrder(blockTokens);
+    return [
+      {
+        type: "modified",
+        beforeIndex: removedBlock[0].beforeIndex,
+        afterIndex: addedBlock[0].afterIndex,
+      },
+    ];
   }
 
   // Larger blocks: try key-based monotonic pairing
