@@ -383,6 +383,10 @@ function buildRowTokens(
   const consumedA = new Set<number>();
   const tokens: RowToken[] = [];
 
+  // Each alignment entry maps a physical diff line to a logical CSV row via
+  // line-number lookup. Entries that don't resolve (header rows sliced off by
+  // resolveHeaderAndData, or continuation lines of multi-line CSV fields whose
+  // start line was already consumed) are silently skipped.
   for (const entry of alignment) {
     if (entry.type === "unchanged") {
       const bi =
