@@ -52,7 +52,7 @@ For Firefox, load `dist/firefox-mv2/` via `about:debugging`.
 
 ## Extension Testing
 
-To verify extension behavior in the browser, use `playwright-cli open --extension` to connect to the user's running browser with the extension installed.
+To verify extension behavior in the browser, use `playwright-cli attach --extension` to connect to the user's running browser with the extension installed.
 
 ## Plan Files
 
