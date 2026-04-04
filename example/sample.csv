@@ -1,7 +1,8 @@
 id,name,email,department,salary
-1,Alice Johnson,alice.johnson@example.com,Engineering,80000
+1,Alice Johnson,alice.johnson@example.org,Engineering,85000
 2,Bob Smith,bob.smith@example.com,Marketing,75000
-3,Charlie Brown,charlie.brown@example.com,Engineering,90000
-4,Diana Prince,diana.prince@example.com,Sales,70000
+3,Charles Brown,charles.brown@example.com,Engineering,92000
 5,Eve Williams,eve.williams@example.com,Human Resources,72000
-6,Frank Miller,frank.miller@example.com,Marketing,68000
+6,Frank Miller,frank.miller@sample.com,Product Design,70000
+7,Grace Lee,grace.lee@example.com,Engineering,78000
+8,Hank Davis,hank.davis@example.com,Sales,65000
