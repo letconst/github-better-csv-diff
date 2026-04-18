@@ -1,5 +1,5 @@
-product_id,name,price,category
-P001,Widget Alpha,1200,Electronics
-P002,Widget Beta,800,Electronics
-P003,Gadget Pro X,3500,Home & Garden
-P004,Tool Master Y,500,Tools & Hardware
+product_id,name,price,category,stock,discount
+P001,Widget Alpha,1500,Electronics,120,0.1
+P002,Widget Beta,800,Electronics,45,0
+P003,Gadget Pro X+,3200,Home & Garden,8,0.15
+P004,Tool Master Y,500,Tools & Hardware,200,0
