@@ -1,0 +1,37 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "group:allNonMajor"
+  ],
+  "timezone": "Asia/Tokyo",
+  "schedule": ["* * * * 0"],
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "chore(deps):",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "bump",
+  "postUpdateOptions": ["npmDedupe"],
+  "configMigration": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* * * * 0"]
+  },
+  "packageRules": [
+    {
+      "description": "npm: only update versions released at least 3 days ago (per-package, fall back to older safe versions)",
+      "matchDatasources": ["npm"],
+      "minimumReleaseAge": "3 days",
+      "internalChecksFilter": "strict"
+    },
+    {
+      "description": "Auto-merge @types/* minor/patch (override group:allNonMajor)",
+      "matchPackageNames": ["@types/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "type definitions",
+      "automerge": true
+    }
+  ]
+}
