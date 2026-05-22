@@ -22,11 +22,11 @@
     "lint:fix": "biome check --fix src/"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.12",
+    "@biomejs/biome": "2.4.15",
     "@types/papaparse": "^5.5.2",
     "@wxt-dev/auto-icons": "^1.1.1",
     "typescript": "^6.0.3",
-    "wxt": "^0.20.25"
+    "wxt": "^0.20.26"
   },
   "private": true,
   "dependencies": {
