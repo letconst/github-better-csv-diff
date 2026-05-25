@@ -15,6 +15,7 @@ import {
   type RenderOptions,
   renderDiffTable,
   type SideHeaderMode,
+  syncColumnWidths,
   syncRowHeights,
 } from "../renderer/tableRenderer";
 import { clearHeaderCache, fetchCsvHeaderRow } from "./headerFetcher";
@@ -48,6 +49,23 @@ export function initObserverLifecycle(): void {
   document.addEventListener("turbo:load", syncObserverWithRoute);
   document.addEventListener("pjax:end", syncObserverWithRoute);
   window.addEventListener("popstate", syncObserverWithRoute);
+
+  // Re-derive sticky offset + column widths on viewport resize: GitHub's sticky
+  // `top` and our column widths can both change at responsive breakpoints, which
+  // a per-element ResizeObserver alone may miss.
+  window.addEventListener("resize", handleViewportResize, { passive: true });
+
+  // Re-derive the sticky-top offset on scroll. GitHub applies the file-header's
+  // sticky `top` asynchronously (React/virtualization), so the inject-time read
+  // can land while it is still `auto` (→ offset short by ~58px, header hides
+  // behind GitHub's bar). Re-reading once scrolling begins self-heals it; the
+  // value is stable, so repeated reads are idempotent. rAF-throttled.
+  // Capture phase so scrolls from any nested scroll container are caught too
+  // (scroll events don't bubble, but capture-phase listeners still fire).
+  window.addEventListener("scroll", handleViewportScroll, {
+    passive: true,
+    capture: true,
+  });
 
   // Poll for URL changes that bypass Turbo/PJAX events (e.g. GitHub PR tab
   // switches via pushState in the main world, invisible to content script's
@@ -88,10 +106,186 @@ function disconnectObserver(): void {
   // Clear cached revision context and header cache on navigation
   clearRevisionContextCache();
   clearHeaderCache();
+  // Disconnect per-table ResizeObservers and cancel pending rAFs so they don't
+  // leak across navigations / Turbo snapshot caching.
+  teardownAllContainerStates();
   if (!observer) return;
   observer.disconnect();
   observer = null;
   console.debug("[GitHub Better CSV Diff] Observer disconnected");
+}
+
+// --- Sticky header offset + responsive column/row sync ---
+
+interface PerContainerState {
+  tableElement: HTMLElement;
+  container: HTMLElement;
+  wrapper: HTMLElement;
+  config: UiConfig;
+  observers: ResizeObserver[];
+  rafId: number | null;
+  syncing: boolean;
+  /** Last value written to --csv-diff-sticky-top; lets us skip no-op rewrites. */
+  lastStickyTop: string | null;
+}
+
+const containerStates = new Map<HTMLElement, PerContainerState>();
+
+/** A wrapper can only be measured while attached and not toggled to Raw Diff. */
+function isWrapperMeasurable(wrapper: HTMLElement): boolean {
+  return wrapper.isConnected && wrapper.style.display !== "none";
+}
+
+/**
+ * Set --csv-diff-sticky-top from GitHub's own sticky file-header geometry so the
+ * CSV header pins directly below it. `top` resolves to "auto" (NaN) if the
+ * selector misses; coerce to 0 (degrades to viewport-top sticky).
+ */
+function updateStickyTopOffset(
+  container: HTMLElement,
+  wrapper: HTMLElement,
+  config: UiConfig,
+  state?: PerContainerState,
+): void {
+  if (!isWrapperMeasurable(wrapper)) return;
+  const fileHeader = container.querySelector<HTMLElement>(
+    config.stickyFileHeaderSelector,
+  );
+  const next = fileHeader
+    ? `${(Number.parseFloat(getComputedStyle(fileHeader).top) || 0) + fileHeader.getBoundingClientRect().height}px`
+    : "0px";
+  if (!fileHeader) {
+    console.warn(
+      "[GitHub Better CSV Diff] Sticky file-header not found:",
+      config.stickyFileHeaderSelector,
+    );
+  }
+  // Skip the write (and its style recalc) when the value is unchanged — this
+  // runs for every container on every scroll rAF, so an unguarded setProperty
+  // would dirty the custom property each frame and force needless reflows.
+  if (state && state.lastStickyTop === next) return;
+  wrapper.style.setProperty("--csv-diff-sticky-top", next);
+  if (state) state.lastStickyTop = next;
+}
+
+/** Re-measure sticky offset + column widths + row heights for one table. */
+function resyncTable(state: PerContainerState): void {
+  if (!isWrapperMeasurable(state.wrapper)) return;
+  updateStickyTopOffset(state.container, state.wrapper, state.config, state);
+  syncColumnWidths(state.tableElement);
+  syncRowHeights(state.tableElement);
+}
+
+/**
+ * Schedule a coalesced resync. The `syncing` flag + rAF break the ResizeObserver
+ * feedback loop: our own width writes resize the observed body, but those
+ * callbacks land while `syncing` is still true and are ignored; the flag is
+ * released one frame later, after the self-induced resize has flushed.
+ */
+function scheduleResync(state: PerContainerState): void {
+  if (state.syncing || !isWrapperMeasurable(state.wrapper)) return;
+  if (state.rafId != null) cancelAnimationFrame(state.rafId);
+  state.rafId = requestAnimationFrame(() => {
+    state.rafId = null;
+    if (!isWrapperMeasurable(state.wrapper)) return;
+    state.syncing = true;
+    syncColumnWidths(state.tableElement);
+    syncRowHeights(state.tableElement);
+    requestAnimationFrame(() => {
+      state.syncing = false;
+    });
+  });
+}
+
+/**
+ * Initial sync + ResizeObserver registration for a freshly injected/rerendered
+ * table. Tears down any prior state for the container first.
+ */
+function setupTableObservers(
+  tableElement: HTMLElement,
+  container: HTMLElement,
+  wrapper: HTMLElement,
+  config: UiConfig,
+): void {
+  teardownContainerState(container);
+
+  const state: PerContainerState = {
+    tableElement,
+    container,
+    wrapper,
+    config,
+    observers: [],
+    rafId: null,
+    syncing: false,
+    lastStickyTop: null,
+  };
+  containerStates.set(container, state);
+
+  resyncTable(state);
+
+  // Re-sync columns/rows when a body resizes (font load, responsive width),
+  // guarded against the self-induced feedback loop.
+  for (const body of tableElement.querySelectorAll<HTMLElement>(
+    ".csv-diff-body",
+  )) {
+    const ro = new ResizeObserver(() => scheduleResync(state));
+    ro.observe(body);
+    state.observers.push(ro);
+  }
+
+  // Re-derive the sticky-top offset when GitHub's file-header changes height.
+  // Writing the CSS var doesn't resize the file-header, so no loop guard needed.
+  const fileHeader = container.querySelector<HTMLElement>(
+    config.stickyFileHeaderSelector,
+  );
+  if (fileHeader) {
+    const ro = new ResizeObserver(() =>
+      updateStickyTopOffset(container, wrapper, config, state),
+    );
+    ro.observe(fileHeader);
+    state.observers.push(ro);
+  }
+}
+
+function teardownContainerState(container: HTMLElement): void {
+  const state = containerStates.get(container);
+  if (!state) return;
+  for (const ro of state.observers) ro.disconnect();
+  if (state.rafId != null) cancelAnimationFrame(state.rafId);
+  containerStates.delete(container);
+}
+
+function teardownAllContainerStates(): void {
+  for (const container of [...containerStates.keys()]) {
+    teardownContainerState(container);
+  }
+}
+
+function handleViewportResize(): void {
+  for (const state of containerStates.values()) {
+    // The offset must apply synchronously so the sticky position is correct for
+    // the new viewport before paint; column/row sync is rAF-deferred via
+    // scheduleResync (which carries the ResizeObserver loop guard).
+    updateStickyTopOffset(state.container, state.wrapper, state.config, state);
+    scheduleResync(state);
+  }
+}
+
+let offsetUpdateScheduled = false;
+function handleViewportScroll(): void {
+  if (offsetUpdateScheduled) return;
+  offsetUpdateScheduled = true;
+  requestAnimationFrame(() => {
+    offsetUpdateScheduled = false;
+    for (const state of containerStates.values()) {
+      updateStickyTopOffset(
+        state.container,
+        state.wrapper,
+        state.config,
+        state,
+      );
+    }
+  });
 }
 
 function processExistingDiffs(): void {
@@ -107,11 +301,23 @@ function processExistingDiffs(): void {
 
   for (const container of [...previewContainers, ...classicContainers]) {
     if (container.hasAttribute(PROCESSED_ATTR)) {
-      // Wrapper still present — nothing to do
-      if (container.querySelector(".csv-diff-wrapper")) continue;
+      const wrapper = container.querySelector<HTMLElement>(".csv-diff-wrapper");
+      if (wrapper) {
+        // Wrapper present AND observer state live — fully processed, skip.
+        if (containerStates.has(container)) continue;
 
-      // Wrapper is gone (GitHub rebuilt diffBody on collapse/re-expand).
+        // Wrapper present but state gone: a Turbo snapshot / bfcache restore
+        // brought back the markup with all JS-attached listeners + observers
+        // stripped (disconnectObserver ran on before-cache). Drop the stale
+        // wrapper and fall through to a full re-init, which re-renders +
+        // re-injects and thereby re-attaches scroll/toggle listeners and
+        // re-registers observers.
+        wrapper.remove();
+      }
+
+      // Wrapper gone (collapse/re-expand rebuild, or removed just above).
       // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand.
+      teardownContainerState(container);
       container.removeAttribute("data-csv-diff-raw");
     }
 
@@ -214,6 +420,8 @@ function processCsvDiffBlock(
 
     fetchAndRerender({
       wrapper: wrapper as HTMLElement,
+      container,
+      config,
       csvDiff,
       owner: ctx.owner,
       repo: ctx.repo,
@@ -280,6 +488,8 @@ function determineInitialSideMode(
 
 interface FetchAndRerenderParams {
   wrapper: HTMLElement;
+  container: HTMLElement;
+  config: UiConfig;
   csvDiff: CsvDiff;
   owner: string;
   repo: string;
@@ -295,6 +505,8 @@ interface FetchAndRerenderParams {
 async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
   const {
     wrapper,
+    container,
+    config,
     csvDiff,
     owner,
     repo,
@@ -332,7 +544,9 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     const oldContainer = wrapper.querySelector(".csv-diff-container");
     if (oldContainer) {
       oldContainer.replaceWith(newTable);
-      syncRowHeights(newTable);
+      // Re-init sticky offset + column/row sync and re-register observers on the
+      // replacement table (the old container's observers are now stale).
+      setupTableObservers(newTable, container, wrapper, config);
     }
   } catch (error) {
     console.warn(
@@ -501,12 +715,11 @@ function injectTableOverlay(
     toggleBtn.classList.toggle("csv-diff-toggle-active", !isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
-    // Re-sync row heights when toggling back to table view
+    // Re-sync sticky offset + column widths + row heights when toggling back to
+    // table view (all read 0 while the wrapper was display:none).
     if (!isTableVisible) {
-      const currentTable = wrapper.querySelector<HTMLElement>(
-        ".csv-diff-container",
-      );
-      if (currentTable) syncRowHeights(currentTable);
+      const state = containerStates.get(container);
+      if (state) resyncTable(state);
     }
   });
 
@@ -515,7 +728,7 @@ function injectTableOverlay(
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(false);
   diffBody.prepend(wrapper);
-  syncRowHeights(tableElement);
+  setupTableObservers(tableElement, container, wrapper, config);
   return true;
 }
 
