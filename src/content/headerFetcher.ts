@@ -58,7 +58,9 @@ async function doFetch(
     .map((seg) => encodeURIComponent(seg))
     .join("/");
 
-  const baseUrl = `/${owner}/${repo}/raw/${ref}/${encodedPath}`;
+  // Use an absolute URL: Firefox content scripts resolve relative URLs against
+  // the extension origin (moz-extension://), not the page, so fetch() throws.
+  const baseUrl = `${location.origin}/${owner}/${repo}/raw/${ref}/${encodedPath}`;
   let rangeEnd = INITIAL_RANGE;
 
   while (rangeEnd <= MAX_RANGE) {
