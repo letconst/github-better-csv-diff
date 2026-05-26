@@ -315,7 +315,18 @@ function processExistingDiffs(): void {
         // wrapper and fall through to a full re-init, which re-renders +
         // re-injects and thereby re-attaches scroll/toggle listeners and
         // re-registers observers.
+        //
+        // First un-hide the original diff children: injectTableOverlay hid them
+        // with inline display:none, which the snapshot preserved. Restoring them
+        // before removing the wrapper guarantees the raw diff is visible if the
+        // re-init below early-returns (e.g. collapsed file, no diff lines).
+        const diffBody = wrapper.parentElement;
         wrapper.remove();
+        if (diffBody) {
+          for (const child of diffBody.children) {
+            (child as HTMLElement).style.display = "";
+          }
+        }
       }
 
       // Wrapper gone (collapse/re-expand rebuild, or removed just above).
