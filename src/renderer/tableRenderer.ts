@@ -151,14 +151,21 @@ export function syncColumnWidths(container: HTMLElement): void {
     for (const col of [...headerCols, ...bodyCols]) col.style.width = "";
 
     // Read pass — per column, max(header, first body row) to avoid clipping.
-    const headerCells =
-      headerTable.querySelectorAll<HTMLElement>("thead tr > *");
+    const headerCells = Array.from(
+      headerTable.querySelectorAll<HTMLTableCellElement>("thead tr > *"),
+    );
+    // The loading header is a single th[colSpan=n], which doesn't map 1:1 to
+    // columns — its width would wrongly drive column 0 to the full table width.
+    // Measure from the body alone while any header cell spans multiple columns.
+    const hasSpanningHeaderCell = headerCells.some((cell) => cell.colSpan > 1);
     const bodyCells =
       bodyTable.querySelector<HTMLTableRowElement>("tbody tr")?.children ??
       null;
     const widths = new Array<number>(n);
     for (let c = 0; c < n; c++) {
-      const headerWidth = headerCells[c]?.getBoundingClientRect().width ?? 0;
+      const headerWidth = hasSpanningHeaderCell
+        ? 0
+        : (headerCells[c]?.getBoundingClientRect().width ?? 0);
       const bodyCell = bodyCells?.[c] as HTMLElement | undefined;
       const bodyWidth = bodyCell?.getBoundingClientRect().width ?? 0;
       widths[c] = Math.ceil(Math.max(headerWidth, bodyWidth));
