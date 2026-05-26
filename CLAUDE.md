@@ -52,7 +52,7 @@ For Firefox, load `dist/firefox-mv2/` via `about:debugging`.
 
 ## Extension Testing
 
-To verify extension behavior in the browser, use `playwright-cli open --extension` to connect to the user's running browser with the extension installed.
+To verify extension behavior in the browser, use `playwright-cli attach --extension` to connect to the user's running browser with the extension installed.
 
 ## Plan Files
 
@@ -63,4 +63,4 @@ To verify extension behavior in the browser, use `playwright-cli open --extensio
 - DOM-based diff parsing (not GitHub REST API) to avoid authentication
 - Side-by-side (Before / After) table layout
 - Match CSV rows by first column (ID/key) when possible; fall back to line-order matching
-- Minimal permissions: no host permissions beyond `github.com`
+- Minimal permissions: Chrome declares no host permissions (content-script `fetch` inherits page privileges). Firefox content-script `fetch` runs with the extension principal, so cross-origin requests require explicit host permissions — declared **for the Firefox build only** in `wxt.config.ts` (`github.com` + `raw.githubusercontent.com`, the latter being the redirect target of `github.com/.../raw/...`)

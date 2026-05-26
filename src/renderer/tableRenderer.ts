@@ -2,7 +2,7 @@
  * Renders side-by-side (Before / After) diff tables from parsed CSV data.
  */
 
-import type { CsvDiff } from "../parser/diffParser";
+import type { CsvDiff, DiffAlignment } from "../parser/diffParser";
 import {
   appendTextWithBreaks,
   computeInlineDiff,
@@ -83,7 +83,7 @@ export function syncRowHeights(container: HTMLElement): void {
   if (!container.isConnected || !container.getClientRects().length) return;
 
   const tables = container.querySelectorAll<HTMLTableElement>(
-    ".csv-diff-side table",
+    ".csv-diff-body-table",
   );
   if (tables.length !== 2) return;
 
@@ -111,6 +111,104 @@ export function syncRowHeights(container: HTMLElement): void {
     const h = `${heights[i]}px`;
     beforeRows[i].style.height = h;
     afterRows[i].style.height = h;
+  }
+}
+
+/**
+ * Align each side's frozen header table columns with its body table columns.
+ * Header and body live in separate tables (so the header can escape the body's
+ * scroll container and stick to the viewport), so their column widths must be
+ * synced explicitly. Runs per side independently — Before/After widths need not
+ * match; only the intra-side header↔body columns must align.
+ *
+ * Must run after the container is inserted into the document; both this and
+ * syncRowHeights are connectivity-gated and no-op on a detached node.
+ */
+export function syncColumnWidths(container: HTMLElement): void {
+  if (!container.isConnected || !container.getClientRects().length) return;
+
+  const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
+  for (const side of sides) {
+    const headerTable = side.querySelector<HTMLTableElement>(
+      ".csv-diff-header-table",
+    );
+    const bodyTable = side.querySelector<HTMLTableElement>(
+      ".csv-diff-body-table",
+    );
+    if (!headerTable || !bodyTable) continue;
+
+    const headerCols = headerTable.querySelectorAll<HTMLTableColElement>("col");
+    const bodyCols = bodyTable.querySelectorAll<HTMLTableColElement>("col");
+    const n = headerCols.length;
+    if (n === 0 || n !== bodyCols.length) continue;
+
+    // Clear pass — drop fixed layout and any width applied by a prior pass so
+    // the read pass measures true natural widths, not stale constrained ones.
+    for (const table of [headerTable, bodyTable]) {
+      table.style.tableLayout = "auto";
+      table.style.width = "";
+    }
+    for (const col of [...headerCols, ...bodyCols]) col.style.width = "";
+
+    // Read pass — per column, max(header, first body row) to avoid clipping.
+    const headerCells = Array.from(
+      headerTable.querySelectorAll<HTMLTableCellElement>("thead tr > *"),
+    );
+    // The loading header is a single th[colSpan=n], which doesn't map 1:1 to
+    // columns — its width would wrongly drive column 0 to the full table width.
+    // Measure from the body alone while any header cell spans multiple columns.
+    const hasSpanningHeaderCell = headerCells.some((cell) => cell.colSpan > 1);
+    const bodyCells =
+      bodyTable.querySelector<HTMLTableRowElement>("tbody tr")?.children ??
+      null;
+    const widths = new Array<number>(n);
+    for (let c = 0; c < n; c++) {
+      const headerWidth = hasSpanningHeaderCell
+        ? 0
+        : (headerCells[c]?.getBoundingClientRect().width ?? 0);
+      const bodyCell = bodyCells?.[c] as HTMLElement | undefined;
+      const bodyWidth = bodyCell?.getBoundingClientRect().width ?? 0;
+      widths[c] = Math.ceil(Math.max(headerWidth, bodyWidth));
+    }
+
+    // Fill the side's width when the natural columns are narrower than the
+    // available space (restoring the old width:100% behaviour) by distributing
+    // the slack across the data columns proportionally to their natural width;
+    // the line-number column (index 0) stays narrow. When the natural columns
+    // overflow, leave them as-is so the body scrolls horizontally.
+    const naturalTotal = widths.reduce((sum, w) => sum + w, 0);
+    const available = bodyTable.parentElement?.clientWidth ?? 0;
+    const dataCount = n - 1;
+    if (available > naturalTotal && dataCount > 0) {
+      const slack = available - naturalTotal;
+      const dataTotal = naturalTotal - widths[0];
+      let distributed = 0;
+      for (let c = 1; c < n; c++) {
+        // Give the remainder to the last data column so columns sum exactly.
+        const add =
+          c === n - 1
+            ? slack - distributed
+            : dataTotal > 0
+              ? Math.round((slack * widths[c]) / dataTotal)
+              : Math.round(slack / dataCount);
+        widths[c] += add;
+        distributed += add;
+      }
+    }
+
+    // Write pass — identical per-column + total widths on both tables, fixed
+    // layout, so their horizontal scroll ranges match exactly.
+    let total = 0;
+    for (let c = 0; c < n; c++) {
+      const w = `${widths[c]}px`;
+      headerCols[c].style.width = w;
+      bodyCols[c].style.width = w;
+      total += widths[c];
+    }
+    for (const table of [headerTable, bodyTable]) {
+      table.style.tableLayout = "fixed";
+      table.style.width = `${total}px`;
+    }
   }
 }
 
@@ -144,6 +242,7 @@ export function renderDiffTable(
     after.data,
     before.lineNums,
     after.lineNums,
+    diff.alignment,
   );
 
   container.appendChild(
@@ -169,18 +268,32 @@ export function renderDiffTable(
 
   highlightChangedCells(container, matched);
 
-  // Synchronize horizontal scroll between Before and After sides
-  const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
-  if (sides.length === 2) {
+  // Synchronize horizontal scroll between Before and After sides. The body is
+  // the only horizontal scroll container; mirror its scrollLeft to the other
+  // body AND to both header strips (overflow:hidden, scrolled programmatically)
+  // so the frozen headers track their columns. scrollLeft only — a whole-table
+  // transform would drag the sticky-left line-number column off too.
+  const bodies = container.querySelectorAll<HTMLElement>(".csv-diff-body");
+  const strips = container.querySelectorAll<HTMLElement>(
+    ".csv-diff-header-strip",
+  );
+  if (bodies.length === 2) {
     let syncing = false;
-    for (const side of sides) {
-      side.addEventListener("scroll", () => {
-        if (syncing) return;
-        syncing = true;
-        const other = side === sides[0] ? sides[1] : sides[0];
-        other.scrollLeft = side.scrollLeft;
-        syncing = false;
-      });
+    for (const body of bodies) {
+      body.addEventListener(
+        "scroll",
+        () => {
+          if (syncing) return;
+          syncing = true;
+          const left = body.scrollLeft;
+          for (const other of bodies) {
+            if (other !== body) other.scrollLeft = left;
+          }
+          for (const strip of strips) strip.scrollLeft = left;
+          syncing = false;
+        },
+        { passive: true },
+      );
     }
   }
 
@@ -203,14 +316,43 @@ function buildSide(
   headerDiv.textContent = label;
   sideDiv.appendChild(headerDiv);
 
+  // Header and body are separate tables so the header strip can escape the
+  // body's horizontal scroll container and stick to the viewport. Their column
+  // widths are aligned at runtime by syncColumnWidths.
+  sideDiv.appendChild(buildHeaderTable(headers, maxCols, isLoading));
+  sideDiv.appendChild(buildBodyTable(matched, side, maxCols));
+  return sideDiv;
+}
+
+/** Append a `<colgroup>` of `colCount` `<col>` elements as the table's width carrier. */
+function appendColgroup(table: HTMLTableElement, colCount: number): void {
+  const colgroup = document.createElement("colgroup");
+  for (let i = 0; i < colCount; i++) {
+    colgroup.appendChild(document.createElement("col"));
+  }
+  table.appendChild(colgroup);
+}
+
+/** Build the sticky header strip containing the column-header table. */
+function buildHeaderTable(
+  headers: string[],
+  maxCols: number,
+  isLoading: boolean,
+): HTMLElement {
+  const strip = document.createElement("div");
+  strip.className = "csv-diff-header-strip";
+
   const table = document.createElement("table");
+  table.className = "csv-diff-header-table";
+  const colCount = maxCols + 1; // +1 for the line number column
+  appendColgroup(table, colCount);
+
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
 
   if (isLoading) {
-    // Loading placeholder: single cell spanning all columns (line-num + data cols)
     const th = document.createElement("th");
-    th.colSpan = maxCols + 1; // +1 for line number column
+    th.colSpan = colCount;
     th.textContent = "Loading...";
     th.className = "csv-diff-loading";
     headerRow.appendChild(th);
@@ -229,6 +371,24 @@ function buildSide(
   }
   thead.appendChild(headerRow);
   table.appendChild(thead);
+
+  strip.appendChild(table);
+  return strip;
+}
+
+/** Build the horizontally-scrollable body containing the data-row table. */
+function buildBodyTable(
+  matched: MatchedRow[],
+  side: "before" | "after",
+  maxCols: number,
+): HTMLElement {
+  const bodyDiv = document.createElement("div");
+  bodyDiv.className = "csv-diff-body";
+
+  const table = document.createElement("table");
+  table.className = "csv-diff-body-table";
+  const colCount = maxCols + 1; // +1 for the line number column
+  appendColgroup(table, colCount);
 
   const tbody = document.createElement("tbody");
 
@@ -268,8 +428,8 @@ function buildSide(
   }
 
   table.appendChild(tbody);
-  sideDiv.appendChild(table);
-  return sideDiv;
+  bodyDiv.appendChild(table);
+  return bodyDiv;
 }
 
 function highlightChangedCells(
@@ -331,12 +491,311 @@ export function matchRows(
   after: string[][],
   beforeLineNums: Array<number | null>,
   afterLineNums: Array<number | null>,
+  alignment?: DiffAlignment[],
 ): MatchedRow[] {
+  if (alignment) {
+    const result = matchByAlignment(
+      alignment,
+      before,
+      after,
+      beforeLineNums,
+      afterLineNums,
+    );
+    if (
+      result.consumedBefore === before.length &&
+      result.consumedAfter === after.length
+    ) {
+      return result.rows;
+    }
+  }
   if (isFirstColumnKey(before, after)) {
     return matchByKey(before, after, beforeLineNums, afterLineNums);
   }
   return matchByOrder(before, after, beforeLineNums, afterLineNums);
 }
+
+// --- Alignment-based matching ---
+
+interface RowToken {
+  type: "removed" | "added" | "unchanged";
+  beforeIndex: number | null;
+  afterIndex: number | null;
+}
+
+function buildRowTokens(
+  alignment: DiffAlignment[],
+  beforeLineNums: Array<number | null>,
+  afterLineNums: Array<number | null>,
+): RowToken[] {
+  const bMap = new Map<number, number>();
+  for (let i = 0; i < beforeLineNums.length; i++) {
+    const ln = beforeLineNums[i];
+    if (ln != null) bMap.set(ln, i);
+  }
+  const aMap = new Map<number, number>();
+  for (let i = 0; i < afterLineNums.length; i++) {
+    const ln = afterLineNums[i];
+    if (ln != null) aMap.set(ln, i);
+  }
+
+  const consumedB = new Set<number>();
+  const consumedA = new Set<number>();
+  const tokens: RowToken[] = [];
+
+  // Each alignment entry maps a physical diff line to a logical CSV row via
+  // line-number lookup. Entries that don't resolve (header rows sliced off by
+  // resolveHeaderAndData, or continuation lines of multi-line CSV fields whose
+  // start line was already consumed) are silently skipped.
+  for (const entry of alignment) {
+    if (entry.type === "unchanged") {
+      const bi =
+        entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;
+      const ai =
+        entry.newLineNumber != null ? aMap.get(entry.newLineNumber) : undefined;
+      if (bi === undefined || ai === undefined) continue;
+      if (consumedB.has(bi) || consumedA.has(ai)) continue;
+      consumedB.add(bi);
+      consumedA.add(ai);
+      tokens.push({ type: "unchanged", beforeIndex: bi, afterIndex: ai });
+    } else if (entry.type === "removed") {
+      const bi =
+        entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;
+      if (bi === undefined || consumedB.has(bi)) continue;
+      consumedB.add(bi);
+      tokens.push({ type: "removed", beforeIndex: bi, afterIndex: null });
+    } else {
+      const ai =
+        entry.newLineNumber != null ? aMap.get(entry.newLineNumber) : undefined;
+      if (ai === undefined || consumedA.has(ai)) continue;
+      consumedA.add(ai);
+      tokens.push({ type: "added", beforeIndex: null, afterIndex: ai });
+    }
+  }
+
+  return tokens;
+}
+
+interface PairedToken {
+  type: "removed" | "added" | "modified" | "unchanged";
+  beforeIndex: number | null;
+  afterIndex: number | null;
+}
+
+function pairBlocks(
+  tokens: RowToken[],
+  beforeData: string[][],
+  afterData: string[][],
+): PairedToken[] {
+  const result: PairedToken[] = [];
+  let i = 0;
+
+  while (i < tokens.length) {
+    if (tokens[i].type === "unchanged") {
+      result.push(tokens[i]);
+      i++;
+      continue;
+    }
+
+    // Collect all non-unchanged tokens until the next unchanged (or end).
+    // Split layout may interleave removed/added, so we keep the original
+    // order for fallback while separating into removed/added for pairing.
+    const blockTokens: RowToken[] = [];
+    const removedBlock: RowToken[] = [];
+    const addedBlock: RowToken[] = [];
+    while (i < tokens.length && tokens[i].type !== "unchanged") {
+      blockTokens.push(tokens[i]);
+      if (tokens[i].type === "removed") {
+        removedBlock.push(tokens[i]);
+      } else {
+        addedBlock.push(tokens[i]);
+      }
+      i++;
+    }
+
+    if (removedBlock.length === 0) {
+      result.push(...addedBlock);
+      continue;
+    }
+
+    if (addedBlock.length === 0) {
+      result.push(...removedBlock);
+      continue;
+    }
+
+    result.push(
+      ...tryPairBlock(
+        removedBlock,
+        addedBlock,
+        blockTokens,
+        beforeData,
+        afterData,
+      ),
+    );
+  }
+
+  return result;
+}
+
+function tryPairBlock(
+  removedBlock: RowToken[],
+  addedBlock: RowToken[],
+  blockTokens: RowToken[],
+  beforeData: string[][],
+  afterData: string[][],
+): PairedToken[] {
+  // 1R/1A: always pair as modified (position-based, like GitHub split view).
+  // Adjacent removed+added in the diff are the same logical edit regardless
+  // of whether the first column changed — moved rows are separated by context.
+  if (removedBlock.length === 1 && addedBlock.length === 1) {
+    return [
+      {
+        type: "modified",
+        beforeIndex: removedBlock[0].beforeIndex,
+        afterIndex: addedBlock[0].afterIndex,
+      },
+    ];
+  }
+
+  // Larger blocks: try key-based monotonic pairing
+  // Check keys are non-empty and unique within each side
+  const rKeys = new Map<string, number>();
+  for (let j = 0; j < removedBlock.length; j++) {
+    const key = beforeData[removedBlock[j].beforeIndex!]?.[0] ?? "";
+    if (!key || rKeys.has(key)) return emitOriginalOrder(blockTokens);
+    rKeys.set(key, j);
+  }
+  const aKeys = new Map<string, number>();
+  for (let j = 0; j < addedBlock.length; j++) {
+    const key = afterData[addedBlock[j].afterIndex!]?.[0] ?? "";
+    if (!key || aKeys.has(key)) return emitOriginalOrder(blockTokens);
+    aKeys.set(key, j);
+  }
+
+  // Match by key and check monotonicity
+  const matches: Array<{ rIdx: number; aIdx: number }> = [];
+  for (const [key, rIdx] of rKeys) {
+    const aIdx = aKeys.get(key);
+    if (aIdx !== undefined) {
+      matches.push({ rIdx, aIdx });
+    }
+  }
+  matches.sort((a, b) => a.aIdx - b.aIdx);
+
+  // Verify monotonic on removed side
+  let lastR = -1;
+  for (const m of matches) {
+    if (m.rIdx < lastR) return emitOriginalOrder(blockTokens);
+    lastR = m.rIdx;
+  }
+
+  // Two-cursor merge: emit in diff order
+  const matchedR = new Set(matches.map((m) => m.rIdx));
+  const matchedA = new Set(matches.map((m) => m.aIdx));
+  const result: PairedToken[] = [];
+
+  let nextR = 0;
+  let nextA = 0;
+  for (const { rIdx, aIdx } of matches) {
+    // Flush unmatched removed before this anchor
+    while (nextR < rIdx) {
+      if (!matchedR.has(nextR)) {
+        result.push(removedBlock[nextR]);
+      }
+      nextR++;
+    }
+    // Flush unmatched added before this anchor
+    while (nextA < aIdx) {
+      if (!matchedA.has(nextA)) {
+        result.push(addedBlock[nextA]);
+      }
+      nextA++;
+    }
+    // Emit modified pair
+    result.push({
+      type: "modified",
+      beforeIndex: removedBlock[rIdx].beforeIndex,
+      afterIndex: addedBlock[aIdx].afterIndex,
+    });
+    nextR = rIdx + 1;
+    nextA = aIdx + 1;
+  }
+
+  // Flush remaining
+  while (nextR < removedBlock.length) {
+    if (!matchedR.has(nextR)) {
+      result.push(removedBlock[nextR]);
+    }
+    nextR++;
+  }
+  while (nextA < addedBlock.length) {
+    if (!matchedA.has(nextA)) {
+      result.push(addedBlock[nextA]);
+    }
+    nextA++;
+  }
+
+  return result;
+}
+
+function emitOriginalOrder(blockTokens: RowToken[]): PairedToken[] {
+  return [...blockTokens];
+}
+
+function matchByAlignment(
+  alignment: DiffAlignment[],
+  beforeData: string[][],
+  afterData: string[][],
+  beforeLineNums: Array<number | null>,
+  afterLineNums: Array<number | null>,
+): { rows: MatchedRow[]; consumedBefore: number; consumedAfter: number } {
+  const tokens = buildRowTokens(alignment, beforeLineNums, afterLineNums);
+  const paired = pairBlocks(tokens, beforeData, afterData);
+
+  const consumedB = new Set<number>();
+  const consumedA = new Set<number>();
+  const rows: MatchedRow[] = [];
+
+  for (const p of paired) {
+    const bi = p.beforeIndex;
+    const ai = p.afterIndex;
+    const beforeRow = bi != null ? beforeData[bi] : null;
+    const afterRow = ai != null ? afterData[ai] : null;
+
+    let type: MatchedRow["type"];
+    if (p.type === "removed") {
+      type = "removed";
+    } else if (p.type === "added") {
+      type = "added";
+    } else {
+      // "modified" or "unchanged" — verify with actual content.
+      // Handles: multiline continuation edits (unchanged token, different content)
+      // and reorder-only anchors (modified token, identical content).
+      type =
+        beforeRow && afterRow && arraysEqual(beforeRow, afterRow)
+          ? "unchanged"
+          : "modified";
+    }
+
+    rows.push({
+      before: beforeRow,
+      after: afterRow,
+      type,
+      beforeLineNumber: bi != null ? lineNumAt(beforeLineNums, bi) : null,
+      afterLineNumber: ai != null ? lineNumAt(afterLineNums, ai) : null,
+    });
+
+    if (bi != null) consumedB.add(bi);
+    if (ai != null) consumedA.add(ai);
+  }
+
+  return {
+    rows,
+    consumedBefore: consumedB.size,
+    consumedAfter: consumedA.size,
+  };
+}
+
+// --- Key/order-based matching (fallback) ---
 
 function isFirstColumnKey(before: string[][], after: string[][]): boolean {
   if (before.length === 0 && after.length === 0) return false;
