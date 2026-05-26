@@ -273,7 +273,10 @@ function handleViewportResize(): void {
 
 let offsetUpdateScheduled = false;
 function handleViewportScroll(): void {
-  if (offsetUpdateScheduled) return;
+  // The capture-phase listener stays installed for the page's lifetime; skip all
+  // per-scroll work on non-diff routes (or after teardown) where there's nothing
+  // to reposition.
+  if (containerStates.size === 0 || offsetUpdateScheduled) return;
   offsetUpdateScheduled = true;
   requestAnimationFrame(() => {
     offsetUpdateScheduled = false;
