@@ -1,7 +1,7 @@
 id,first_name,last_name,email,department,title,location,country,phone,start_date,salary,manager,status,level,team,cost_center,employee_type,notes
 1001,Alice,Anderson,alice@example.com,Engineering,Senior Engineer,Seattle,USA,555-0101,2019-03-15,145000,Carol King,active,L5,Platform,CC-100,full-time,Tech lead for auth
-1002,Bob,Brown,bob@example.com,Engineering,Engineer,Austin,USA,555-0102,2020-07-01,120000,Carol King,active,L4,Platform,CC-100,full-time,Backend services
+1002,Bob,Brown,bob@example.com,Engineering,Senior Engineer,Austin,USA,555-0102,2020-07-01,135000,Carol King,active,L5,Platform,CC-100,full-time,Promoted to senior
 1003,Carol,King,carol@example.com,Engineering,Engineering Manager,Seattle,USA,555-0103,2017-01-10,180000,Dan Lee,active,L6,Platform,CC-100,full-time,Manages platform team
-1004,Dan,Lee,dan@example.com,Engineering,Director,Remote,USA,555-0104,2015-05-20,210000,Eve Moss,active,L7,Leadership,CC-001,full-time,Org leader
+1004,Dan,Lee,dan@example.com,Engineering,Director,San Francisco,USA,555-0104,2015-05-20,210000,Eve Moss,on-leave,L7,Leadership,CC-001,full-time,Org leader
 1005,Eve,Moss,eve@example.com,Product,VP Product,New York,USA,555-0105,2014-09-01,250000,,active,L8,Leadership,CC-001,full-time,Product vision
-1006,Frank,Nash,frank@example.com,Design,Designer,London,UK,555-0106,2021-02-18,95000,Eve Moss,active,L4,Design,CC-200,contractor,UI work
+1007,Grace,Owens,grace@example.com,Design,Senior Designer,London,UK,555-0107,2018-11-30,115000,Eve Moss,active,L5,Design,CC-200,full-time,Design system owner
