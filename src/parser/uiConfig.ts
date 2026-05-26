@@ -15,6 +15,11 @@ export interface UiConfig {
   contentSelector: string;
   /** Selector for the header actions area where the toggle button is inserted. */
   actionsSelector: string;
+  /**
+   * Selector for GitHub's own sticky file-header bar. The CSV column header pins
+   * directly below it, so its rendered height drives the sticky-top offset.
+   */
+  stickyFileHeaderSelector: string;
   extractContent(cell: HTMLTableCellElement): string;
   /** Extract text from a changed (added/removed) content cell, stripping diff marker if present. */
   extractChangedContent(cell: HTMLTableCellElement): string;
@@ -31,6 +36,7 @@ export const PREVIEW_UI: UiConfig = {
   headerSelector: ":scope > :first-child",
   contentSelector: ":scope > :nth-child(2)",
   actionsSelector: '[class*="diffHeaderActionWrapper"], [class*="ActionGroup"]',
+  stickyFileHeaderSelector: 'div[class*="diffHeaderWrapper"]',
   extractContent: (cell) => cell.textContent ?? "",
   extractChangedContent: (cell) => {
     const text = cell.textContent ?? "";
@@ -53,6 +59,7 @@ export const CLASSIC_UI: UiConfig = {
   headerSelector: ".file-header",
   contentSelector: ".js-file-content",
   actionsSelector: ".file-actions > .d-flex",
+  stickyFileHeaderSelector: ".file-header",
   extractContent: (cell) =>
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
   extractChangedContent: (cell) =>

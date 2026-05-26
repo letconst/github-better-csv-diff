@@ -83,7 +83,7 @@ export function syncRowHeights(container: HTMLElement): void {
   if (!container.isConnected || !container.getClientRects().length) return;
 
   const tables = container.querySelectorAll<HTMLTableElement>(
-    ".csv-diff-side table",
+    ".csv-diff-body-table",
   );
   if (tables.length !== 2) return;
 
@@ -111,6 +111,104 @@ export function syncRowHeights(container: HTMLElement): void {
     const h = `${heights[i]}px`;
     beforeRows[i].style.height = h;
     afterRows[i].style.height = h;
+  }
+}
+
+/**
+ * Align each side's frozen header table columns with its body table columns.
+ * Header and body live in separate tables (so the header can escape the body's
+ * scroll container and stick to the viewport), so their column widths must be
+ * synced explicitly. Runs per side independently — Before/After widths need not
+ * match; only the intra-side header↔body columns must align.
+ *
+ * Must run after the container is inserted into the document; both this and
+ * syncRowHeights are connectivity-gated and no-op on a detached node.
+ */
+export function syncColumnWidths(container: HTMLElement): void {
+  if (!container.isConnected || !container.getClientRects().length) return;
+
+  const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
+  for (const side of sides) {
+    const headerTable = side.querySelector<HTMLTableElement>(
+      ".csv-diff-header-table",
+    );
+    const bodyTable = side.querySelector<HTMLTableElement>(
+      ".csv-diff-body-table",
+    );
+    if (!headerTable || !bodyTable) continue;
+
+    const headerCols = headerTable.querySelectorAll<HTMLTableColElement>("col");
+    const bodyCols = bodyTable.querySelectorAll<HTMLTableColElement>("col");
+    const n = headerCols.length;
+    if (n === 0 || n !== bodyCols.length) continue;
+
+    // Clear pass — drop fixed layout and any width applied by a prior pass so
+    // the read pass measures true natural widths, not stale constrained ones.
+    for (const table of [headerTable, bodyTable]) {
+      table.style.tableLayout = "auto";
+      table.style.width = "";
+    }
+    for (const col of [...headerCols, ...bodyCols]) col.style.width = "";
+
+    // Read pass — per column, max(header, first body row) to avoid clipping.
+    const headerCells = Array.from(
+      headerTable.querySelectorAll<HTMLTableCellElement>("thead tr > *"),
+    );
+    // The loading header is a single th[colSpan=n], which doesn't map 1:1 to
+    // columns — its width would wrongly drive column 0 to the full table width.
+    // Measure from the body alone while any header cell spans multiple columns.
+    const hasSpanningHeaderCell = headerCells.some((cell) => cell.colSpan > 1);
+    const bodyCells =
+      bodyTable.querySelector<HTMLTableRowElement>("tbody tr")?.children ??
+      null;
+    const widths = new Array<number>(n);
+    for (let c = 0; c < n; c++) {
+      const headerWidth = hasSpanningHeaderCell
+        ? 0
+        : (headerCells[c]?.getBoundingClientRect().width ?? 0);
+      const bodyCell = bodyCells?.[c] as HTMLElement | undefined;
+      const bodyWidth = bodyCell?.getBoundingClientRect().width ?? 0;
+      widths[c] = Math.ceil(Math.max(headerWidth, bodyWidth));
+    }
+
+    // Fill the side's width when the natural columns are narrower than the
+    // available space (restoring the old width:100% behaviour) by distributing
+    // the slack across the data columns proportionally to their natural width;
+    // the line-number column (index 0) stays narrow. When the natural columns
+    // overflow, leave them as-is so the body scrolls horizontally.
+    const naturalTotal = widths.reduce((sum, w) => sum + w, 0);
+    const available = bodyTable.parentElement?.clientWidth ?? 0;
+    const dataCount = n - 1;
+    if (available > naturalTotal && dataCount > 0) {
+      const slack = available - naturalTotal;
+      const dataTotal = naturalTotal - widths[0];
+      let distributed = 0;
+      for (let c = 1; c < n; c++) {
+        // Give the remainder to the last data column so columns sum exactly.
+        const add =
+          c === n - 1
+            ? slack - distributed
+            : dataTotal > 0
+              ? Math.round((slack * widths[c]) / dataTotal)
+              : Math.round(slack / dataCount);
+        widths[c] += add;
+        distributed += add;
+      }
+    }
+
+    // Write pass — identical per-column + total widths on both tables, fixed
+    // layout, so their horizontal scroll ranges match exactly.
+    let total = 0;
+    for (let c = 0; c < n; c++) {
+      const w = `${widths[c]}px`;
+      headerCols[c].style.width = w;
+      bodyCols[c].style.width = w;
+      total += widths[c];
+    }
+    for (const table of [headerTable, bodyTable]) {
+      table.style.tableLayout = "fixed";
+      table.style.width = `${total}px`;
+    }
   }
 }
 
@@ -170,18 +268,32 @@ export function renderDiffTable(
 
   highlightChangedCells(container, matched);
 
-  // Synchronize horizontal scroll between Before and After sides
-  const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
-  if (sides.length === 2) {
+  // Synchronize horizontal scroll between Before and After sides. The body is
+  // the only horizontal scroll container; mirror its scrollLeft to the other
+  // body AND to both header strips (overflow:hidden, scrolled programmatically)
+  // so the frozen headers track their columns. scrollLeft only — a whole-table
+  // transform would drag the sticky-left line-number column off too.
+  const bodies = container.querySelectorAll<HTMLElement>(".csv-diff-body");
+  const strips = container.querySelectorAll<HTMLElement>(
+    ".csv-diff-header-strip",
+  );
+  if (bodies.length === 2) {
     let syncing = false;
-    for (const side of sides) {
-      side.addEventListener("scroll", () => {
-        if (syncing) return;
-        syncing = true;
-        const other = side === sides[0] ? sides[1] : sides[0];
-        other.scrollLeft = side.scrollLeft;
-        syncing = false;
-      });
+    for (const body of bodies) {
+      body.addEventListener(
+        "scroll",
+        () => {
+          if (syncing) return;
+          syncing = true;
+          const left = body.scrollLeft;
+          for (const other of bodies) {
+            if (other !== body) other.scrollLeft = left;
+          }
+          for (const strip of strips) strip.scrollLeft = left;
+          syncing = false;
+        },
+        { passive: true },
+      );
     }
   }
 
@@ -204,14 +316,43 @@ function buildSide(
   headerDiv.textContent = label;
   sideDiv.appendChild(headerDiv);
 
+  // Header and body are separate tables so the header strip can escape the
+  // body's horizontal scroll container and stick to the viewport. Their column
+  // widths are aligned at runtime by syncColumnWidths.
+  sideDiv.appendChild(buildHeaderTable(headers, maxCols, isLoading));
+  sideDiv.appendChild(buildBodyTable(matched, side, maxCols));
+  return sideDiv;
+}
+
+/** Append a `<colgroup>` of `colCount` `<col>` elements as the table's width carrier. */
+function appendColgroup(table: HTMLTableElement, colCount: number): void {
+  const colgroup = document.createElement("colgroup");
+  for (let i = 0; i < colCount; i++) {
+    colgroup.appendChild(document.createElement("col"));
+  }
+  table.appendChild(colgroup);
+}
+
+/** Build the sticky header strip containing the column-header table. */
+function buildHeaderTable(
+  headers: string[],
+  maxCols: number,
+  isLoading: boolean,
+): HTMLElement {
+  const strip = document.createElement("div");
+  strip.className = "csv-diff-header-strip";
+
   const table = document.createElement("table");
+  table.className = "csv-diff-header-table";
+  const colCount = maxCols + 1; // +1 for the line number column
+  appendColgroup(table, colCount);
+
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
 
   if (isLoading) {
-    // Loading placeholder: single cell spanning all columns (line-num + data cols)
     const th = document.createElement("th");
-    th.colSpan = maxCols + 1; // +1 for line number column
+    th.colSpan = colCount;
     th.textContent = "Loading...";
     th.className = "csv-diff-loading";
     headerRow.appendChild(th);
@@ -230,6 +371,24 @@ function buildSide(
   }
   thead.appendChild(headerRow);
   table.appendChild(thead);
+
+  strip.appendChild(table);
+  return strip;
+}
+
+/** Build the horizontally-scrollable body containing the data-row table. */
+function buildBodyTable(
+  matched: MatchedRow[],
+  side: "before" | "after",
+  maxCols: number,
+): HTMLElement {
+  const bodyDiv = document.createElement("div");
+  bodyDiv.className = "csv-diff-body";
+
+  const table = document.createElement("table");
+  table.className = "csv-diff-body-table";
+  const colCount = maxCols + 1; // +1 for the line number column
+  appendColgroup(table, colCount);
 
   const tbody = document.createElement("tbody");
 
@@ -269,8 +428,8 @@ function buildSide(
   }
 
   table.appendChild(tbody);
-  sideDiv.appendChild(table);
-  return sideDiv;
+  bodyDiv.appendChild(table);
+  return bodyDiv;
 }
 
 function highlightChangedCells(
