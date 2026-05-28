@@ -1,9 +1,41 @@
+import { type Plugin, transformWithEsbuild } from "vite";
 import { defineConfig } from "wxt";
+
+// Drops dev-only console.debug/log calls from production bundles while keeping
+// console.warn/error, which the project intentionally uses to surface errors.
+// WXT ignores top-level `esbuild` config from the vite() hook, so this runs as
+// a Vite plugin: esbuild marks the calls pure, and minifySyntax removes them
+// because their return value is unused.
+function stripDebugLogs(): Plugin {
+  return {
+    name: "strip-debug-logs",
+    apply: "build",
+    async transform(code, id) {
+      if (!/\.[jt]sx?$/.test(id)) return null;
+      if (!code.includes("console.debug") && !code.includes("console.log")) {
+        return null;
+      }
+      const result = await transformWithEsbuild(code, id, {
+        pure: ["console.debug", "console.log"],
+        minifySyntax: true,
+      });
+      return { code: result.code, map: result.map };
+    },
+  };
+}
 
 export default defineConfig({
   srcDir: "src",
   outDir: "dist",
   modules: ["@wxt-dev/auto-icons"],
+  // Strip dev-only noise (console.debug/log) from production bundles while
+  // keeping console.warn/error, which the project intentionally uses to
+  // surface errors. esbuild's `pure` lets minification drop these calls
+  // because their return value is unused; dev builds skip minify, so the
+  // calls remain there for debugging.
+  vite: (env) => ({
+    plugins: env.mode === "production" ? [stripDebugLogs()] : [],
+  }),
   autoIcons: {
     baseIconPath: "assets/icon.svg",
   },
