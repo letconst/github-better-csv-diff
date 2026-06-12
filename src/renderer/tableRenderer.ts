@@ -486,7 +486,7 @@ function lineNumAt(nums: Array<number | null>, i: number): number | null {
   return nums[i] ?? null;
 }
 
-export function matchRows(
+function matchRows(
   before: string[][],
   after: string[][],
   beforeLineNums: Array<number | null>,
@@ -661,13 +661,13 @@ function tryPairBlock(
   const rKeys = new Map<string, number>();
   for (let j = 0; j < removedBlock.length; j++) {
     const key = beforeData[removedBlock[j].beforeIndex!]?.[0] ?? "";
-    if (!key || rKeys.has(key)) return emitOriginalOrder(blockTokens);
+    if (!key || rKeys.has(key)) return [...blockTokens];
     rKeys.set(key, j);
   }
   const aKeys = new Map<string, number>();
   for (let j = 0; j < addedBlock.length; j++) {
     const key = afterData[addedBlock[j].afterIndex!]?.[0] ?? "";
-    if (!key || aKeys.has(key)) return emitOriginalOrder(blockTokens);
+    if (!key || aKeys.has(key)) return [...blockTokens];
     aKeys.set(key, j);
   }
 
@@ -684,7 +684,7 @@ function tryPairBlock(
   // Verify monotonic on removed side
   let lastR = -1;
   for (const m of matches) {
-    if (m.rIdx < lastR) return emitOriginalOrder(blockTokens);
+    if (m.rIdx < lastR) return [...blockTokens];
     lastR = m.rIdx;
   }
 
@@ -735,10 +735,6 @@ function tryPairBlock(
   }
 
   return result;
-}
-
-function emitOriginalOrder(blockTokens: RowToken[]): PairedToken[] {
-  return [...blockTokens];
 }
 
 function matchByAlignment(

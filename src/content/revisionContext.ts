@@ -10,6 +10,8 @@
  *   branch is updated while viewing. Same-repo compares only.
  */
 
+import { parseDiffRoute } from "./routes";
+
 export interface RevisionContext {
   owner: string;
   repo: string;
@@ -53,71 +55,40 @@ function refsFromSha(sha: string): Refs {
 }
 
 function resolveRefs(pathname: string): Refs {
-  if (isStandaloneCommitRoute(pathname)) {
-    const sha = extractStandaloneCommitSha(pathname);
-    return extractCommitRefs() ?? (sha ? refsFromSha(sha) : NO_REFS);
-  }
+  const route = parseDiffRoute(pathname);
+  if (!route) return NO_REFS;
 
-  if (isPrCommitRoute(pathname)) {
-    const sha = extractCommitShaFromUrl(pathname);
-    return (
-      extractCommitRefs() ??
-      extractPreviewPrRefs() ??
-      (sha ? refsFromSha(sha) : NO_REFS)
-    );
-  }
+  switch (route.kind) {
+    case "commit":
+      return extractCommitRefs() ?? refsFromSha(route.sha);
 
-  if (isPreviewPrRoute(pathname)) {
-    return extractPreviewPrRefs() ?? NO_REFS;
-  }
+    case "pr-commit":
+      return (
+        extractCommitRefs() ?? extractPreviewPrRefs() ?? refsFromSha(route.sha)
+      );
 
-  if (isClassicPrRoute(pathname)) {
-    // Classic UI: only headRef is reliable (end_commit_oid).
-    // baseRef (base_commit_oid) is the head's parent, not the merge base.
-    const el = document.querySelector<HTMLElement>(
-      '[data-url*="show_partial_comparison"]',
-    );
-    if (el) {
-      const dataUrl = el.getAttribute("data-url") ?? "";
-      return {
-        baseRef: null,
-        headRef: extractUrlParam(dataUrl, "end_commit_oid"),
-      };
+    case "pr-changes":
+      return extractPreviewPrRefs() ?? NO_REFS;
+
+    case "pr-files": {
+      // Classic UI: only headRef is reliable (end_commit_oid).
+      // baseRef (base_commit_oid) is the head's parent, not the merge base.
+      const el = document.querySelector<HTMLElement>(
+        '[data-url*="show_partial_comparison"]',
+      );
+      if (el) {
+        const dataUrl = el.getAttribute("data-url") ?? "";
+        return {
+          baseRef: null,
+          headRef: extractUrlParam(dataUrl, "end_commit_oid"),
+        };
+      }
+      return NO_REFS;
     }
-    return NO_REFS;
+
+    case "compare":
+      return parseCompareRefs(route.spec);
   }
-
-  if (isCompareRoute(pathname)) {
-    return parseCompareRefs(pathname) ?? NO_REFS;
-  }
-
-  return NO_REFS;
-}
-
-// --- Route detection helpers ---
-
-function isPreviewPrRoute(pathname: string): boolean {
-  return /^\/[^/]+\/[^/]+\/pull\/\d+\/changes\/?$/i.test(pathname);
-}
-
-function isClassicPrRoute(pathname: string): boolean {
-  return /^\/[^/]+\/[^/]+\/pull\/\d+\/files\/?$/i.test(pathname);
-}
-
-/** Standalone commit page: /owner/repo/commit/:sha */
-function isStandaloneCommitRoute(pathname: string): boolean {
-  return /^\/[^/]+\/[^/]+\/commit\/[0-9a-f]{7,40}\/?$/i.test(pathname);
-}
-
-/** PR commit pages: /pull/:id/changes/:sha or /pull/:id/commits/:sha */
-function isPrCommitRoute(pathname: string): boolean {
-  return /^\/[^/]+\/[^/]+\/pull\/\d+\/(changes|commits)\/[0-9a-f]{7,40}\/?$/i.test(
-    pathname,
-  );
-}
-
-function isCompareRoute(pathname: string): boolean {
-  return /^\/[^/]+\/[^/]+\/compare\/.+$/i.test(pathname);
 }
 
 // --- Parsing helpers ---
@@ -133,20 +104,6 @@ function extractUrlParam(url: string, param: string): string | null {
   if (queryStart === -1) return null;
   const params = new URLSearchParams(url.slice(queryStart));
   return params.get(param);
-}
-
-/** Extract commit sha from standalone commit URL like /owner/repo/commit/:sha */
-function extractStandaloneCommitSha(pathname: string): string | null {
-  const match = pathname.match(/\/commit\/([0-9a-f]{7,40})\/?$/i);
-  return match ? match[1] : null;
-}
-
-/** Extract commit sha from PR commit URLs like /pull/:id/commits/:sha or /pull/:id/changes/:sha */
-function extractCommitShaFromUrl(pathname: string): string | null {
-  const match = pathname.match(
-    /\/pull\/\d+\/(?:commits|changes)\/([0-9a-f]{7,40})\/?$/i,
-  );
-  return match ? match[1] : null;
 }
 
 function extractCommitRefs(): {
@@ -205,16 +162,10 @@ function extractPreviewPrRefs(): {
   return null;
 }
 
-function parseCompareRefs(pathname: string): {
-  baseRef: string | null;
-  headRef: string | null;
-} | null {
-  const match = pathname.match(/^\/[^/]+\/[^/]+\/compare\/(.+)$/i);
-  if (!match) return null;
-
-  const compareSpec = match[1];
+/** Resolve refs from a compare spec like "main...feature" (already URL-stripped). */
+function parseCompareRefs(compareSpec: string): Refs {
   const separatorIndex = compareSpec.indexOf("...");
-  if (separatorIndex === -1) return null;
+  if (separatorIndex === -1) return NO_REFS;
 
   const rawBase = decodeURIComponent(compareSpec.slice(0, separatorIndex));
   const rawHead = decodeURIComponent(compareSpec.slice(separatorIndex + 3));
