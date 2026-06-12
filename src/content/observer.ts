@@ -32,8 +32,6 @@ const CSV_EXTENSIONS = [".csv", ".tsv"];
 
 let observer: MutationObserver | null = null;
 let debouncedCallback: CancellableCallback | null = null;
-// biome-ignore lint/correctness/noUnusedVariables: retained for future teardown
-let urlPollTimer: ReturnType<typeof setInterval> | null = null;
 let lifecycleInitialized = false;
 
 export function initObserverLifecycle(): void {
@@ -70,8 +68,9 @@ export function initObserverLifecycle(): void {
   // Poll for URL changes that bypass Turbo/PJAX events (e.g. GitHub PR tab
   // switches via pushState in the main world, invisible to content script's
   // isolated world). Safe if DOM isn't ready: processExistingDiffs is idempotent,
-  // and the MutationObserver will catch later inserts.
-  urlPollTimer = watchUrlChanges(syncObserverWithRoute);
+  // and the MutationObserver will catch later inserts. The interval lives for
+  // the page's lifetime by design, so its handle is not retained.
+  watchUrlChanges(syncObserverWithRoute);
 
   // Initial route check
   syncObserverWithRoute();
@@ -751,11 +750,9 @@ function injectTableOverlay(
  * script's isolated world (e.g. pushState called by the page's main world).
  * Compares pathname only — query/hash changes don't affect route gating.
  */
-function watchUrlChanges(
-  onNavigate: () => void,
-): ReturnType<typeof setInterval> {
+function watchUrlChanges(onNavigate: () => void): void {
   let lastPathname = location.pathname;
-  return setInterval(() => {
+  setInterval(() => {
     if (location.pathname !== lastPathname) {
       lastPathname = location.pathname;
       onNavigate();

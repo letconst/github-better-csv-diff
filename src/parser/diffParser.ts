@@ -56,36 +56,6 @@ export function getFirstLineNumbers(lines: DiffLine[]): {
   return { firstBeforeLine, firstAfterLine };
 }
 
-export function parseUnifiedDiff(diffText: string): DiffLine[] {
-  const lines = diffText.split("\n");
-  const result: DiffLine[] = [];
-
-  function makeLine(type: DiffLine["type"], content: string): DiffLine {
-    return { type, content, oldLineNumber: null, newLineNumber: null };
-  }
-
-  for (const line of lines) {
-    if (
-      line.startsWith("@@") ||
-      line.startsWith("--- ") ||
-      line.startsWith("+++ ") ||
-      line.startsWith("\\")
-    ) {
-      continue;
-    }
-
-    if (line.startsWith("+")) {
-      result.push(makeLine("added", line.slice(1)));
-    } else if (line.startsWith("-")) {
-      result.push(makeLine("removed", line.slice(1)));
-    } else if (line.startsWith(" ")) {
-      result.push(makeLine("unchanged", line.slice(1)));
-    }
-  }
-
-  return result;
-}
-
 export function diffToCsv(lines: DiffLine[]): CsvDiff {
   const beforeLines: string[] = [];
   const afterLines: string[] = [];

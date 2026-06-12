@@ -4,17 +4,6 @@
 
 import Papa from "papaparse";
 
-export function parseCsv(raw: string): string[][] {
-  const result = Papa.parse<string[]>(raw, {
-    header: false,
-    skipEmptyLines: true,
-  });
-  if (result.errors.length > 0) {
-    console.warn("[GitHub Better CSV Diff] CSV parse errors:", result.errors);
-  }
-  return result.data;
-}
-
 /**
  * Parses CSV while tracking which physical input line each CSV row starts on.
  * Uses Papa's `step` callback with `meta.cursor` to map character offsets
