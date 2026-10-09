@@ -19,7 +19,8 @@
     "zip:firefox": "wxt zip -b firefox",
     "postinstall": "wxt prepare",
     "lint": "biome check src/",
-    "lint:fix": "biome check --fix src/"
+    "lint:fix": "biome check --fix src/",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

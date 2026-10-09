@@ -87,30 +87,30 @@ export function syncRowHeights(container: HTMLElement): void {
   );
   if (tables.length !== 2) return;
 
-  const beforeRows = tables[0].querySelectorAll<HTMLTableRowElement>("tr");
-  const afterRows = tables[1].querySelectorAll<HTMLTableRowElement>("tr");
+  const beforeRows = tables[0]!.querySelectorAll<HTMLTableRowElement>("tr");
+  const afterRows = tables[1]!.querySelectorAll<HTMLTableRowElement>("tr");
   const len = Math.min(beforeRows.length, afterRows.length);
 
   // Clear pass
   for (let i = 0; i < len; i++) {
-    beforeRows[i].style.height = "";
-    afterRows[i].style.height = "";
+    beforeRows[i]!.style.height = "";
+    afterRows[i]!.style.height = "";
   }
 
   // Read pass — collect natural heights
   const heights: number[] = new Array(len);
   for (let i = 0; i < len; i++) {
     heights[i] = Math.max(
-      beforeRows[i].offsetHeight,
-      afterRows[i].offsetHeight,
+      beforeRows[i]!.offsetHeight,
+      afterRows[i]!.offsetHeight,
     );
   }
 
   // Write pass — apply heights
   for (let i = 0; i < len; i++) {
     const h = `${heights[i]}px`;
-    beforeRows[i].style.height = h;
-    afterRows[i].style.height = h;
+    beforeRows[i]!.style.height = h;
+    afterRows[i]!.style.height = h;
   }
 }
 
@@ -181,7 +181,7 @@ export function syncColumnWidths(container: HTMLElement): void {
     const dataCount = n - 1;
     if (available > naturalTotal && dataCount > 0) {
       const slack = available - naturalTotal;
-      const dataTotal = naturalTotal - widths[0];
+      const dataTotal = naturalTotal - widths[0]!;
       let distributed = 0;
       for (let c = 1; c < n; c++) {
         // Give the remainder to the last data column so columns sum exactly.
@@ -189,9 +189,9 @@ export function syncColumnWidths(container: HTMLElement): void {
           c === n - 1
             ? slack - distributed
             : dataTotal > 0
-              ? Math.round((slack * widths[c]) / dataTotal)
+              ? Math.round((slack * widths[c]!) / dataTotal)
               : Math.round(slack / dataCount);
-        widths[c] += add;
+        widths[c]! += add;
         distributed += add;
       }
     }
@@ -201,9 +201,9 @@ export function syncColumnWidths(container: HTMLElement): void {
     let total = 0;
     for (let c = 0; c < n; c++) {
       const w = `${widths[c]}px`;
-      headerCols[c].style.width = w;
-      bodyCols[c].style.width = w;
-      total += widths[c];
+      headerCols[c]!.style.width = w;
+      bodyCols[c]!.style.width = w;
+      total += widths[c]!;
     }
     for (const table of [headerTable, bodyTable]) {
       table.style.tableLayout = "fixed";
@@ -365,7 +365,7 @@ function buildHeaderTable(
 
     for (let i = 0; i < maxCols; i++) {
       const th = document.createElement("th");
-      setTextWithBreaks(th, i < headers.length ? headers[i] : "");
+      setTextWithBreaks(th, i < headers.length ? headers[i]! : "");
       headerRow.appendChild(th);
     }
   }
@@ -419,7 +419,7 @@ function buildBodyTable(
       if (isEmpty) {
         td.textContent = "\u00A0";
       } else {
-        setTextWithBreaks(td, i < row.length ? row[i] : "");
+        setTextWithBreaks(td, i < row.length ? row[i]! : "");
       }
       tr.appendChild(td);
     }
@@ -439,11 +439,11 @@ function highlightChangedCells(
   const sides = container.querySelectorAll<HTMLElement>(".csv-diff-side");
   if (sides.length < 2) return;
 
-  const beforeRows = sides[0].querySelectorAll("tbody tr");
-  const afterRows = sides[1].querySelectorAll("tbody tr");
+  const beforeRows = sides[0]!.querySelectorAll("tbody tr");
+  const afterRows = sides[1]!.querySelectorAll("tbody tr");
 
   for (let i = 0; i < matched.length; i++) {
-    const match = matched[i];
+    const match = matched[i]!;
     if (match.type !== "modified" || !match.before || !match.after) continue;
 
     const beforeTr = beforeRows[i];
@@ -458,8 +458,8 @@ function highlightChangedCells(
 
     const maxCols = Math.max(match.before.length, match.after.length);
     for (let c = 0; c < maxCols; c++) {
-      const beforeVal = c < match.before.length ? match.before[c] : "";
-      const afterVal = c < match.after.length ? match.after[c] : "";
+      const beforeVal = c < match.before.length ? match.before[c]! : "";
+      const afterVal = c < match.after.length ? match.after[c]! : "";
       if (beforeVal === afterVal) continue;
 
       // +1 offset to skip the line number cell at children[0]
@@ -590,8 +590,8 @@ function pairBlocks(
   let i = 0;
 
   while (i < tokens.length) {
-    if (tokens[i].type === "unchanged") {
-      result.push(tokens[i]);
+    if (tokens[i]!.type === "unchanged") {
+      result.push(tokens[i]!);
       i++;
       continue;
     }
@@ -602,12 +602,12 @@ function pairBlocks(
     const blockTokens: RowToken[] = [];
     const removedBlock: RowToken[] = [];
     const addedBlock: RowToken[] = [];
-    while (i < tokens.length && tokens[i].type !== "unchanged") {
-      blockTokens.push(tokens[i]);
-      if (tokens[i].type === "removed") {
-        removedBlock.push(tokens[i]);
+    while (i < tokens.length && tokens[i]!.type !== "unchanged") {
+      blockTokens.push(tokens[i]!);
+      if (tokens[i]!.type === "removed") {
+        removedBlock.push(tokens[i]!);
       } else {
-        addedBlock.push(tokens[i]);
+        addedBlock.push(tokens[i]!);
       }
       i++;
     }
@@ -650,8 +650,8 @@ function tryPairBlock(
     return [
       {
         type: "modified",
-        beforeIndex: removedBlock[0].beforeIndex,
-        afterIndex: addedBlock[0].afterIndex,
+        beforeIndex: removedBlock[0]!.beforeIndex,
+        afterIndex: addedBlock[0]!.afterIndex,
       },
     ];
   }
@@ -660,13 +660,13 @@ function tryPairBlock(
   // Check keys are non-empty and unique within each side
   const rKeys = new Map<string, number>();
   for (let j = 0; j < removedBlock.length; j++) {
-    const key = beforeData[removedBlock[j].beforeIndex!]?.[0] ?? "";
+    const key = beforeData[removedBlock[j]!.beforeIndex!]?.[0] ?? "";
     if (!key || rKeys.has(key)) return [...blockTokens];
     rKeys.set(key, j);
   }
   const aKeys = new Map<string, number>();
   for (let j = 0; j < addedBlock.length; j++) {
-    const key = afterData[addedBlock[j].afterIndex!]?.[0] ?? "";
+    const key = afterData[addedBlock[j]!.afterIndex!]?.[0] ?? "";
     if (!key || aKeys.has(key)) return [...blockTokens];
     aKeys.set(key, j);
   }
@@ -699,22 +699,22 @@ function tryPairBlock(
     // Flush unmatched removed before this anchor
     while (nextR < rIdx) {
       if (!matchedR.has(nextR)) {
-        result.push(removedBlock[nextR]);
+        result.push(removedBlock[nextR]!);
       }
       nextR++;
     }
     // Flush unmatched added before this anchor
     while (nextA < aIdx) {
       if (!matchedA.has(nextA)) {
-        result.push(addedBlock[nextA]);
+        result.push(addedBlock[nextA]!);
       }
       nextA++;
     }
     // Emit modified pair
     result.push({
       type: "modified",
-      beforeIndex: removedBlock[rIdx].beforeIndex,
-      afterIndex: addedBlock[aIdx].afterIndex,
+      beforeIndex: removedBlock[rIdx]!.beforeIndex,
+      afterIndex: addedBlock[aIdx]!.afterIndex,
     });
     nextR = rIdx + 1;
     nextA = aIdx + 1;
@@ -723,13 +723,13 @@ function tryPairBlock(
   // Flush remaining
   while (nextR < removedBlock.length) {
     if (!matchedR.has(nextR)) {
-      result.push(removedBlock[nextR]);
+      result.push(removedBlock[nextR]!);
     }
     nextR++;
   }
   while (nextA < addedBlock.length) {
     if (!matchedA.has(nextA)) {
-      result.push(addedBlock[nextA]);
+      result.push(addedBlock[nextA]!);
     }
     nextA++;
   }
@@ -754,8 +754,8 @@ function matchByAlignment(
   for (const p of paired) {
     const bi = p.beforeIndex;
     const ai = p.afterIndex;
-    const beforeRow = bi != null ? beforeData[bi] : null;
-    const afterRow = ai != null ? afterData[ai] : null;
+    const beforeRow = bi != null ? beforeData[bi]! : null;
+    const afterRow = ai != null ? afterData[ai]! : null;
 
     let type: MatchedRow["type"];
     if (p.type === "removed") {
@@ -821,25 +821,25 @@ function matchByKey(
 
   const afterIndex = new Map<string, number>();
   for (let i = 0; i < after.length; i++) {
-    afterIndex.set(after[i][0] ?? "", i);
+    afterIndex.set(after[i]![0] ?? "", i);
   }
 
   const result: MatchedRow[] = [];
   let nextAfterFlush = 0;
 
   for (let bi = 0; bi < before.length; bi++) {
-    const beforeRow = before[bi];
+    const beforeRow = before[bi]!;
     const key = beforeRow[0] ?? "";
     const ai = afterIndex.get(key);
 
     if (ai !== undefined) {
       // Flush after-only rows that precede this matched position
       for (let j = nextAfterFlush; j < ai; j++) {
-        const afterKey = after[j][0] ?? "";
+        const afterKey = after[j]![0] ?? "";
         if (!beforeMap.has(afterKey)) {
           result.push({
             before: null,
-            after: after[j],
+            after: after[j]!,
             type: "added",
             beforeLineNumber: null,
             afterLineNumber: lineNumAt(afterLineNums, j),
@@ -848,10 +848,10 @@ function matchByKey(
       }
       nextAfterFlush = Math.max(nextAfterFlush, ai + 1);
 
-      const equal = arraysEqual(beforeRow, after[ai]);
+      const equal = arraysEqual(beforeRow, after[ai]!);
       result.push({
         before: beforeRow,
-        after: after[ai],
+        after: after[ai]!,
         type: equal ? "unchanged" : "modified",
         beforeLineNumber: lineNumAt(beforeLineNums, bi),
         afterLineNumber: lineNumAt(afterLineNums, ai),
@@ -869,11 +869,11 @@ function matchByKey(
 
   // Flush remaining after-only rows
   for (let j = nextAfterFlush; j < after.length; j++) {
-    const afterKey = after[j][0] ?? "";
+    const afterKey = after[j]![0] ?? "";
     if (!beforeMap.has(afterKey)) {
       result.push({
         before: null,
-        after: after[j],
+        after: after[j]!,
         type: "added",
         beforeLineNumber: null,
         afterLineNumber: lineNumAt(afterLineNums, j),
