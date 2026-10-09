@@ -38,11 +38,11 @@ export function parseDiffRoute(
   if (PR_FILES_RE.test(pathname)) return { kind: "pr-files" };
   if (PR_CHANGES_RE.test(pathname)) return { kind: "pr-changes" };
   const prCommit = pathname.match(PR_COMMIT_RE);
-  if (prCommit) return { kind: "pr-commit", sha: prCommit[1] };
+  if (prCommit) return { kind: "pr-commit", sha: prCommit[1]! };
   const commit = pathname.match(COMMIT_RE);
-  if (commit) return { kind: "commit", sha: commit[1] };
+  if (commit) return { kind: "commit", sha: commit[1]! };
   const compare = pathname.match(COMPARE_RE);
-  if (compare) return { kind: "compare", spec: compare[1] };
+  if (compare) return { kind: "compare", spec: compare[1]! };
   return null;
 }
 
