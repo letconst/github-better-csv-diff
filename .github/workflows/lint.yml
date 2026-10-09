@@ -15,18 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24.21.0
-          cache: npm
+      - uses: jdx/mise-action@v5
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - id: lint
-        run: npm run lint
+        run: pnpm lint
 
       - id: typecheck
-        run: npm run typecheck
+        run: pnpm typecheck
 
       - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         name: Collapse previous lint comments
@@ -71,4 +68,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || 'Type check' }}
-          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `npm run lint:fix` to auto-fix.' || 'Run `npm run typecheck` to see the errors.' }}
+          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `pnpm lint:fix` to auto-fix.' || 'Run `pnpm typecheck` to see the errors.' }}

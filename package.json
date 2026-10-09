@@ -28,9 +28,11 @@
     "@wxt-dev/auto-icons": "^1.1.2",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
+    "vite": "^8.3.4",
     "wxt": "^0.21.4"
   },
   "private": true,
+  "packageManager": "pnpm@12.10.1",
   "dependencies": {
     "diff": "^9.0.0",
     "papaparse": "^5.7.0"
