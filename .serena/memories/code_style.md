@@ -13,5 +13,5 @@
 - TypeScript strict mode is mandatory
 
 ## CSS
-- Use GitHub CSS custom properties (e.g. `--borderColor-default`, `--diffBlob-addition-bgColor-line`) for theme compatibility
+- Use GitHub CSS custom properties (e.g. `--borderColor-default`, `--diffBlob-additionLine-bgColor`) for theme compatibility
 - CSS is imported in the content script JS entry point, not in manifest.json

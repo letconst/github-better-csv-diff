@@ -62,5 +62,5 @@ To verify extension behavior in the browser, use `playwright-cli attach --extens
 
 - DOM-based diff parsing (not GitHub REST API) to avoid authentication
 - Side-by-side (Before / After) table layout
-- Match CSV rows by first column (ID/key) when possible; fall back to line-order matching
+- Row matching follows GitHub's diff line order (alignment-based); first-column key matching and line-order matching are fallbacks
 - Minimal permissions: Chrome declares no host permissions (content-script `fetch` inherits page privileges). Firefox content-script `fetch` runs with the extension principal, so cross-origin requests require explicit host permissions — declared **for the Firefox build only** in `wxt.config.ts` (`github.com` + `raw.githubusercontent.com`, the latter being the redirect target of `github.com/.../raw/...`)
