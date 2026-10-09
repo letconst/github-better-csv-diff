@@ -33,5 +33,17 @@
       "groupName": "type definitions",
       "automerge": true
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep biome.json $schema version in sync with @biomejs/biome",
+      "managerFilePatterns": ["/^biome\\.jsonc?$/"],
+      "matchStrings": [
+        "\"\\$schema\":\\s*\"https://biomejs\\.dev/schemas/(?<currentValue>[^/]+)/schema\\.json\""
+      ],
+      "depNameTemplate": "@biomejs/biome",
+      "datasourceTemplate": "npm"
+    }
   ]
 }
