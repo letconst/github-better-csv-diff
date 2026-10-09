@@ -120,7 +120,7 @@ export function extractDiffLinesFromDom(
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
-    if (cells[0].classList.contains(ui.hunkClass)) continue;
+    if (cells[0]!.classList.contains(ui.hunkClass)) continue;
     if (cells.length === 3) {
       isUnifiedLayout = true;
       break;
@@ -139,7 +139,7 @@ export function extractDiffLinesFromDom(
     if (cells.length === 0) continue;
 
     // Hunk header
-    if (cells[0].classList.contains(ui.hunkClass)) {
+    if (cells[0]!.classList.contains(ui.hunkClass)) {
       continue;
     }
 
@@ -147,35 +147,35 @@ export function extractDiffLinesFromDom(
 
     if (isUnifiedLayout) {
       // Unified layout: cells[0]=old line num, cells[1]=new line num, cells[2]=content
-      const isContext = cells[0].classList.contains(ui.contextClass);
-      const oldEmpty = isCellEmpty(cells[0], ui);
-      const newEmpty = isCellEmpty(cells[1], ui);
+      const isContext = cells[0]!.classList.contains(ui.contextClass);
+      const oldEmpty = isCellEmpty(cells[0]!, ui);
+      const newEmpty = isCellEmpty(cells[1]!, ui);
 
       if (isContext) {
         result.push({
           type: "unchanged",
-          content: ui.extractContent(cells[2]),
-          oldLineNumber: ui.extractLineNumber(cells[0]),
-          newLineNumber: ui.extractLineNumber(cells[1]),
+          content: ui.extractContent(cells[2]!),
+          oldLineNumber: ui.extractLineNumber(cells[0]!),
+          newLineNumber: ui.extractLineNumber(cells[1]!),
         });
       } else if (oldEmpty && !newEmpty) {
         result.push({
           type: "added",
-          content: ui.extractChangedContent(cells[2]),
+          content: ui.extractChangedContent(cells[2]!),
           oldLineNumber: null,
-          newLineNumber: ui.extractLineNumber(cells[1]),
+          newLineNumber: ui.extractLineNumber(cells[1]!),
         });
       } else if (newEmpty && !oldEmpty) {
         result.push({
           type: "removed",
-          content: ui.extractChangedContent(cells[2]),
-          oldLineNumber: ui.extractLineNumber(cells[0]),
+          content: ui.extractChangedContent(cells[2]!),
+          oldLineNumber: ui.extractLineNumber(cells[0]!),
           newLineNumber: null,
         });
       } else {
         console.warn(
           "[GitHub Better CSV Diff] Unhandled unified layout row",
-          ui.extractContent(cells[2]),
+          ui.extractContent(cells[2]!),
         );
       }
       continue;
@@ -183,44 +183,44 @@ export function extractDiffLinesFromDom(
 
     // Split layout: cells[0]=left num, cells[1]=left content,
     //               cells[2]=right num, cells[3]=right content
-    const leftEmpty = cells[0].classList.contains(ui.emptyClass);
-    const rightEmpty = cells[2].classList.contains(ui.emptyClass);
-    const isContext = cells[0].classList.contains(ui.contextClass);
+    const leftEmpty = cells[0]!.classList.contains(ui.emptyClass);
+    const rightEmpty = cells[2]!.classList.contains(ui.emptyClass);
+    const isContext = cells[0]!.classList.contains(ui.contextClass);
 
     if (isContext) {
       result.push({
         type: "unchanged",
-        content: ui.extractContent(cells[1]),
-        oldLineNumber: ui.extractLineNumber(cells[0]),
-        newLineNumber: ui.extractLineNumber(cells[2]),
+        content: ui.extractContent(cells[1]!),
+        oldLineNumber: ui.extractLineNumber(cells[0]!),
+        newLineNumber: ui.extractLineNumber(cells[2]!),
       });
     } else if (leftEmpty) {
       result.push({
         type: "added",
-        content: ui.extractChangedContent(cells[3]),
+        content: ui.extractChangedContent(cells[3]!),
         oldLineNumber: null,
-        newLineNumber: ui.extractLineNumber(cells[2]),
+        newLineNumber: ui.extractLineNumber(cells[2]!),
       });
     } else if (rightEmpty) {
       result.push({
         type: "removed",
-        content: ui.extractChangedContent(cells[1]),
-        oldLineNumber: ui.extractLineNumber(cells[0]),
+        content: ui.extractChangedContent(cells[1]!),
+        oldLineNumber: ui.extractLineNumber(cells[0]!),
         newLineNumber: null,
       });
     } else {
       // Modified line -- both sides present
       result.push({
         type: "removed",
-        content: ui.extractChangedContent(cells[1]),
-        oldLineNumber: ui.extractLineNumber(cells[0]),
+        content: ui.extractChangedContent(cells[1]!),
+        oldLineNumber: ui.extractLineNumber(cells[0]!),
         newLineNumber: null,
       });
       result.push({
         type: "added",
-        content: ui.extractChangedContent(cells[3]),
+        content: ui.extractChangedContent(cells[3]!),
         oldLineNumber: null,
-        newLineNumber: ui.extractLineNumber(cells[2]),
+        newLineNumber: ui.extractLineNumber(cells[2]!),
       });
     }
   }
