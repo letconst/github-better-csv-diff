@@ -25,6 +25,7 @@
     "@biomejs/biome": "2.5.15",
     "@types/papaparse": "^5.5.2",
     "@wxt-dev/auto-icons": "^1.1.2",
+    "esbuild": "^0.28.2",
     "typescript": "^6.0.3",
     "wxt": "^0.21.4"
   },
