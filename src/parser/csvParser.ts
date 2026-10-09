@@ -24,7 +24,7 @@ export function parseCsvWithLineMap(
   // Build character offset → physical line index mapping
   const lineStarts: number[] = [0];
   for (let i = 0; i < normalizedLines.length - 1; i++) {
-    lineStarts.push(lineStarts[i] + normalizedLines[i].length + 1);
+    lineStarts.push(lineStarts[i]! + normalizedLines[i]!.length + 1);
   }
 
   function offsetToLineIndex(offset: number): number {
@@ -32,7 +32,7 @@ export function parseCsvWithLineMap(
     let hi = lineStarts.length - 1;
     while (lo < hi) {
       const mid = (lo + hi + 1) >> 1;
-      if (lineStarts[mid] <= offset) lo = mid;
+      if (lineStarts[mid]! <= offset) lo = mid;
       else hi = mid - 1;
     }
     return lo;
@@ -60,7 +60,7 @@ export function parseCsvWithLineMap(
       }
       const lineIdx = offsetToLineIndex(startOffset);
       data.push(results.data);
-      resultLineNumbers.push(lineNumbers[lineIdx]);
+      resultLineNumbers.push(lineNumbers[lineIdx]!);
       prevCursor = results.meta.cursor;
     },
   });
