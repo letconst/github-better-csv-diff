@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+
+# Version pinning is handled by mise.toml; this also keeps pnpm-lock.yaml a
+# single YAML document so GitHub dependency graph can read it (pnpm/pnpm#13805)
+pmOnFail: ignore
