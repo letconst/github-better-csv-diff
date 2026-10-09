@@ -96,7 +96,7 @@ function resolveRefs(pathname: string): Refs {
 function parseOwnerRepo(): { owner: string; repo: string } | null {
   const match = location.pathname.match(/^\/([^/]+)\/([^/]+)/);
   if (!match) return null;
-  return { owner: match[1], repo: match[2] };
+  return { owner: match[1]!, repo: match[2]! };
 }
 
 function extractUrlParam(url: string, param: string): string | null {
@@ -111,7 +111,9 @@ function extractCommitRefs(): {
   headRef: string | null;
 } | null {
   return extractFromEmbeddedJson("commit", (payload) => {
-    const commit = payload?.commit;
+    const commit = payload?.commit as
+      | { parents?: unknown; oid?: string }
+      | undefined;
     if (!commit) return null;
 
     const firstParent =
