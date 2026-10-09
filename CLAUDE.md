@@ -41,10 +41,10 @@ wxt.config.ts    # WXT configuration (manifest + build)
 ## Build & Dev
 
 ```bash
-npm run dev            # Chrome dev (HMR)
-npm run dev:firefox    # Firefox dev
-npm run build          # Chrome production build
-npm run build:firefox  # Firefox production build
+pnpm dev            # Chrome dev (HMR)
+pnpm dev:firefox    # Firefox dev
+pnpm build          # Chrome production build
+pnpm build:firefox  # Firefox production build
 ```
 
 Load `dist/chrome-mv3/` as an unpacked extension in `chrome://extensions` (developer mode).

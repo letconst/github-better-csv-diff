@@ -1,8 +1,8 @@
 # Suggested Commands
 
 ## Build & Dev
-- `npm run dev` - Vite build with --watch (hot rebuild on changes)
-- `npm run build` - Production build to `dist/`
+- `pnpm dev` - Vite build with --watch (hot rebuild on changes)
+- `pnpm build` - Production build to `dist/`
 
 ## Loading the Extension
 - Load `dist/` as an unpacked extension in `chrome://extensions` (developer mode)
