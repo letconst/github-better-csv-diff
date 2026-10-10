@@ -1,11 +1,12 @@
 id,name,description,tags,note
 1,Alpha,"First line
-Second line",tag-a,simple
-2,Beta,"Contains ""quoted"" text",tag-b,
+Second line
+Third line",tag-a,extended
+2,Beta,"Contains ""double-quoted"" text",tag-b,updated
 3,Gamma,"Has, commas, inside",tag-c,normal
-4,Delta,"Multi
-line
-content","tag-d, tag-e",complex
-5,Epsilon,Plain text,tag-f,basic
+4,Delta,Revised content,"tag-d, tag-e",simplified
+5,Epsilon,"Plain text
+with details",tag-f,expanded
 6,Zeta,"Line one
-Line two","tag-g, tag-h",
+Line two
+Line three","tag-g, tag-h",added
