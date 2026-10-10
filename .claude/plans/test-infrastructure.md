@@ -59,7 +59,9 @@ behavior, not freeze the current implementation.
   extractor is asserted per layout and both must reconstruct the same files.
 - Marks on padded cells after a column addition are characterization.
 - Live commit pages embed the commit under `payload.commitRoute.commit`; the
-  extractor now accepts that shape alongside `payload.commit`.
+  extractor now reads `payload.commitRoute.commit` (the shape observed on both
+  logged-in and logged-out pages) and no longer reads `payload.commit`, which
+  was never observed.
 
 ## Refactoring
 
