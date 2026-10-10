@@ -2,23 +2,17 @@ import type { Change } from "diff";
 import { describe, expect, it } from "vitest";
 import { computeInlineDiff } from "./inlineDiff";
 
+const text = (changes: Change[], keep: (c: Change) => boolean) =>
+  changes
+    .filter(keep)
+    .map((c) => c.value)
+    .join("");
+
 const joined = (changes: Change[]) => ({
-  removed: changes
-    .filter((c) => c.removed)
-    .map((c) => c.value)
-    .join(""),
-  added: changes
-    .filter((c) => c.added)
-    .map((c) => c.value)
-    .join(""),
-  before: changes
-    .filter((c) => !c.added)
-    .map((c) => c.value)
-    .join(""),
-  after: changes
-    .filter((c) => !c.removed)
-    .map((c) => c.value)
-    .join(""),
+  removed: text(changes, (c) => Boolean(c.removed)),
+  added: text(changes, (c) => Boolean(c.added)),
+  before: text(changes, (c) => !c.added),
+  after: text(changes, (c) => !c.removed),
 });
 
 describe("computeInlineDiff", () => {
