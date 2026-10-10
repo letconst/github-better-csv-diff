@@ -77,7 +77,8 @@ filename resolution into `uiConfig`) were dropped: happy-dom and a stubbed
 2. #57 renderer and DOM-extraction tests with GitHub fixtures
 3. #59 `rowMatcher.ts` extraction with matcher tests
 4. #60 revisionContext and headerFetcher tests; commit-payload fix
-5. Playwright E2E: setup, injection, toggle, SPA navigation, header fetch
+5. #61 Playwright E2E: setup, injection, toggle, SPA navigation, header fetch
+6. Playwright E2E: geometry, collapse, snapshot restore
 
 ## Playwright E2E
 
@@ -95,9 +96,12 @@ polling), Turbo navigation in both directions, same-path body replacement,
 delayed insertion, header fetch success / 404 fallback / navigation during a
 pending fetch.
 
-Remaining for a later layer: collapsed-file placeholder and re-expand, snapshot
-restore, paired row heights, header/body column alignment, synchronized
-horizontal scroll, sticky offset after scroll, resize.
+Covered in layer 6: paired row heights (multiline cell on one side), header/body
+column alignment, synchronized horizontal scroll with fixed line-number cells,
+sticky offset (late-resolving top picked up on scroll; file-header height change
+via ResizeObserver; media-query change on resize), Classic collapse (table stays,
+verified live), Preview collapse placeholder (assumes header actions re-render,
+unverified), snapshot restore, repeated-mutation idempotence.
 Firefox is excluded (Playwright cannot load extensions there); the attached
 browser workflow in AGENTS.md remains the manual smoke check. Live github.com
 is never a merge gate.
