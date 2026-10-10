@@ -1,7 +1,3 @@
-/**
- * Pairs before/after CSV rows into display rows (alignment, key, or order).
- */
-
 import type { DiffAlignment } from "../parser/diffParser";
 
 export interface MatchedRow {

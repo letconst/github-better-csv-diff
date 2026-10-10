@@ -29,6 +29,9 @@ const row = (
 const A = ["A", "1"];
 const B = ["B", "2"];
 const C = ["C", "3"];
+const B9 = ["B", "9"];
+const A2 = ["A", "2"];
+const A3 = ["A", "3"];
 
 describe("matchRows alignment", () => {
   it("emits a moved row as removed at the old place and added at the new place, in diff order", () => {
@@ -90,9 +93,6 @@ describe("matchRows multiline continuation", () => {
 });
 
 describe("matchRows alignment fallback", () => {
-  const before = [A, B];
-  const after = [A, ["B", "9"]];
-
   it("falls back to key matching when alignment leaves rows unconsumed and keys are unique", () => {
     const k1 = ["k1", "1"];
     const k2 = ["k2", "2"];
@@ -107,8 +107,8 @@ describe("matchRows alignment fallback", () => {
   });
 
   it("falls back to order matching when keys are duplicated", () => {
-    const dupBefore = [A, ["A", "2"]];
-    const dupAfter = [A, ["A", "3"]];
+    const dupBefore = [A, A2];
+    const dupAfter = [A, A3];
     const rows = matchRows(dupBefore, dupAfter, [2, 3], [2, 3], [same(2, 2)]);
     expect(rows).toEqual([
       row("unchanged", A, A, 2, 2),
@@ -120,6 +120,8 @@ describe("matchRows alignment fallback", () => {
     ["undefined", undefined],
     ["empty", []],
   ])("matches by key when alignment is %s", (_name, alignment) => {
+    const before = [A, B];
+    const after = [A, B9];
     expect(matchRows(before, after, [2, 3], [2, 3], alignment)).toEqual([
       row("unchanged", A, A, 2, 2),
       row("modified", B, after[1]!, 3, 3),
@@ -128,11 +130,7 @@ describe("matchRows alignment fallback", () => {
 });
 
 describe("matchRows block pairing", () => {
-  const edited = [
-    ["A", "10"],
-    ["B", "9"],
-    ["C", "30"],
-  ];
+  const edited = [["A", "10"], B9, ["C", "30"]];
   const blockAlignment = [
     gone(2),
     gone(3),
@@ -150,7 +148,7 @@ describe("matchRows block pairing", () => {
         edited,
         [2, 3, 4],
         [2, 3, 4],
-        blockAlignment.slice(0, 6),
+        [gone(2), gone(3), gone(4), came(2), came(3), came(4)],
       ),
     ).toEqual([
       row("modified", A, edited[0]!, 2, 2),
@@ -193,15 +191,8 @@ describe("matchRows block pairing", () => {
   });
 
   it.each([
-    [
-      "an empty key",
-      [["", "1"], B],
-      [
-        ["", "1"],
-        ["B", "9"],
-      ],
-    ],
-    ["a duplicated key", [A, ["A", "2"]], [A, ["B", "2"]]],
+    ["an empty key", [["", "1"], B], [["", "1"], B9]],
+    ["a duplicated key", [A, A2], [A, ["B", "2"]]],
   ])("does not pair a block with %s", (_name, before, after) => {
     expect(
       matchRows(
@@ -235,16 +226,10 @@ describe("matchRows without alignment", () => {
   });
 
   it("pairs duplicate keys by index", () => {
-    const rows = matchRows(
-      [A, ["A", "2"]],
-      [A, ["A", "3"], ["A", "4"]],
-      [2, 3],
-      [2, 3, 4],
-      [],
-    );
+    const rows = matchRows([A, A2], [A, A3, ["A", "4"]], [2, 3], [2, 3, 4], []);
     expect(rows).toEqual([
       row("unchanged", A, A, 2, 2),
-      row("modified", ["A", "2"], ["A", "3"], 3, 3),
+      row("modified", A2, A3, 3, 3),
       row("added", null, ["A", "4"], null, 4),
     ]);
   });
@@ -256,47 +241,36 @@ describe("matchRows without alignment", () => {
 
 describe("matchRows line numbers", () => {
   it("reports null for a row whose line number is null (key path)", () => {
-    expect(matchRows([A, B], [A, ["B", "9"]], [2, null], [2, 3], [])).toEqual([
+    expect(matchRows([A, B], [A, B9], [2, null], [2, 3], [])).toEqual([
       row("unchanged", A, A, 2, 2),
-      row("modified", B, ["B", "9"], null, 3),
+      row("modified", B, B9, null, 3),
     ]);
   });
 
   it("reports null for a row whose line number is null (order path)", () => {
-    expect(
-      matchRows([A, ["A", "2"]], [A, ["A", "3"]], [2, null], [2, 3], []),
-    ).toEqual([
+    expect(matchRows([A, A2], [A, A3], [2, null], [2, 3], [])).toEqual([
       row("unchanged", A, A, 2, 2),
-      row("modified", ["A", "2"], ["A", "3"], null, 3),
+      row("modified", A2, A3, null, 3),
     ]);
   });
 
   it("falls back from alignment when a row has a null line number and cannot be resolved", () => {
     expect(
-      matchRows(
-        [A, B],
-        [A, ["B", "9"]],
-        [2, null],
-        [2, 3],
-        [same(2, 2), same(3, 3)],
-      ),
-    ).toEqual([
-      row("unchanged", A, A, 2, 2),
-      row("modified", B, ["B", "9"], null, 3),
-    ]);
+      matchRows([A, B], [A, B9], [2, null], [2, 3], [same(2, 2), same(3, 3)]),
+    ).toEqual([row("unchanged", A, A, 2, 2), row("modified", B, B9, null, 3)]);
   });
 
   it("characterization: missing line number array elements give null (key path)", () => {
-    expect(matchRows([A, B], [A, ["B", "9"]], [2], [2], [])).toEqual([
+    expect(matchRows([A, B], [A, B9], [2], [2], [])).toEqual([
       row("unchanged", A, A, 2, 2),
-      row("modified", B, ["B", "9"], null, null),
+      row("modified", B, B9, null, null),
     ]);
   });
 
   it("characterization: missing line number array elements give null (order path)", () => {
-    expect(matchRows([A, ["A", "2"]], [A], [2], [], [])).toEqual([
+    expect(matchRows([A, A2], [A], [2], [], [])).toEqual([
       row("unchanged", A, A, 2, null),
-      row("removed", ["A", "2"], null, null, null),
+      row("removed", A2, null, null, null),
     ]);
   });
 });

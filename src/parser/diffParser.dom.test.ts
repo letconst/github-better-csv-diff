@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderDiffTable } from "../renderer/tableRenderer";
 import {
   type DiffLine,
@@ -27,6 +27,29 @@ function loadContainer(fixture: string, selector: string): HTMLElement {
   const container = document.body.querySelector<HTMLElement>(selector);
   if (!container) throw new Error(`no ${selector} in ${fixture}`);
   return container;
+}
+
+interface UiFixture {
+  selector: string;
+  config: UiConfig;
+}
+const CLASSIC: UiFixture = { selector: "div.file.js-file", config: CLASSIC_UI };
+const PREVIEW: UiFixture = {
+  selector: 'div[role="region"]',
+  config: PREVIEW_UI,
+};
+
+const extractedCache = new Map<string, DiffLine[]>();
+function extracted(fixture: string, ui: UiFixture): DiffLine[] {
+  let lines = extractedCache.get(fixture);
+  if (!lines) {
+    lines = extractDiffLinesFromDom(
+      loadContainer(fixture, ui.selector),
+      ui.config,
+    );
+    extractedCache.set(fixture, lines);
+  }
+  return lines;
 }
 
 /**
@@ -77,11 +100,6 @@ describe("extractDiffLinesFromDom: Classic UI (sample.csv, PR #2)", () => {
     removed: r,
     added: a,
   } = diffLineFactory("sample.before.csv", "sample.after.csv");
-  const extract = (fixture: string) =>
-    extractDiffLinesFromDom(
-      loadContainer(fixture, "div.file.js-file"),
-      CLASSIC_UI,
-    );
 
   // Unified lists every removal of a change block before its additions.
   // The hunk header row yields nothing.
@@ -118,18 +136,18 @@ describe("extractDiffLinesFromDom: Classic UI (sample.csv, PR #2)", () => {
   ];
 
   it("extracts every unified line in order, skipping the hunk row", () => {
-    expect(extract("classic-pr-unified")).toEqual(unifiedExpected);
+    expect(extracted("classic-pr-unified", CLASSIC)).toEqual(unifiedExpected);
   });
 
   it("extracts every split line in order, skipping the hunk row", () => {
-    expect(extract("classic-pr-split")).toEqual(splitExpected);
+    expect(extracted("classic-pr-split", CLASSIC)).toEqual(splitExpected);
   });
 
   // Strict DiffLine[] equality does not hold: the two layouts order a change
   // block differently. What must hold is that both reconstruct the same files.
   it("reconstructs the same before and after files from either layout", () => {
-    const split = extract("classic-pr-split");
-    const unified = extract("classic-pr-unified");
+    const split = extracted("classic-pr-split", CLASSIC);
+    const unified = extracted("classic-pr-unified", CLASSIC);
     expect(beforeSide(split)).toEqual(beforeSide(unified));
     expect(afterSide(split)).toEqual(afterSide(unified));
     expect(beforeSide(split).map((l) => l.content)).toEqual(
@@ -147,11 +165,6 @@ describe("extractDiffLinesFromDom: Preview UI (wide.csv, commit 20765189)", () =
     removed: r,
     added: a,
   } = diffLineFactory("wide.before.csv", "wide.after.csv");
-  const extract = (fixture: string) =>
-    extractDiffLinesFromDom(
-      loadContainer(fixture, 'div[role="region"]'),
-      PREVIEW_UI,
-    );
 
   // Header and rows 1001/1003/1005 unchanged; 1002 and 1004 edited; 1006
   // replaced by 1007. Each edit is one removed+added pair in both layouts.
@@ -169,16 +182,16 @@ describe("extractDiffLinesFromDom: Preview UI (wide.csv, commit 20765189)", () =
   ];
 
   it("extracts every split line, stripping the +/- marker", () => {
-    expect(extract("preview-commit-split")).toEqual(expected);
+    expect(extracted("preview-commit-split", PREVIEW)).toEqual(expected);
   });
 
   it("extracts every unified line, stripping the +/- marker", () => {
-    expect(extract("preview-commit-unified")).toEqual(expected);
+    expect(extracted("preview-commit-unified", PREVIEW)).toEqual(expected);
   });
 
   it("yields identical DiffLine[] from split and unified layouts", () => {
-    expect(extract("preview-commit-split")).toEqual(
-      extract("preview-commit-unified"),
+    expect(extracted("preview-commit-split", PREVIEW)).toEqual(
+      extracted("preview-commit-unified", PREVIEW),
     );
   });
 });
@@ -225,6 +238,24 @@ describe("pipeline: fixture to rendered table", () => {
     };
   }
 
+  interface Rendered {
+    lines: DiffLine[];
+    rendered: HTMLElement;
+    before: SideRows;
+    after: SideRows;
+  }
+
+  function renderFixture(fixture: string, ui: UiFixture): Rendered {
+    const lines = extracted(fixture, ui);
+    const rendered = renderDiffTable(diffToCsv(lines));
+    return {
+      lines,
+      rendered,
+      before: sideRows(rendered, 0),
+      after: sideRows(rendered, 1),
+    };
+  }
+
   const headerTexts = (container: HTMLElement, index: 0 | 1) =>
     [
       ...container
@@ -235,20 +266,10 @@ describe("pipeline: fixture to rendered table", () => {
   describe.each(["classic-pr-split", "classic-pr-unified"])(
     "sample.csv from %s",
     (fixture) => {
-      let lines: DiffLine[];
-      let rendered: HTMLElement;
-      let before: SideRows;
-      let after: SideRows;
-
-      beforeAll(() => {
-        lines = extractDiffLinesFromDom(
-          loadContainer(fixture, "div.file.js-file"),
-          CLASSIC_UI,
-        );
-        rendered = renderDiffTable(diffToCsv(lines));
-        before = sideRows(rendered, 0);
-        after = sideRows(rendered, 1);
-      });
+      const { lines, rendered, before, after } = renderFixture(
+        fixture,
+        CLASSIC,
+      );
 
       it("includes line 1 in the diff, so the in-diff header is used", () => {
         expect(getFirstLineNumbers(lines)).toEqual({
@@ -308,22 +329,14 @@ describe("pipeline: fixture to rendered table", () => {
       });
 
       it("shows the cell values of each file", () => {
-        expect(before.cells[0]).toEqual([
-          "1",
-          "Alice Johnson",
-          "alice.johnson@example.com",
-          "Engineering",
-          "80000",
-        ]);
-        expect(after.cells[0]).toEqual([
-          "1",
-          "Alice Johnson",
-          "alice.johnson@example.org",
-          "Engineering",
-          "85000",
-        ]);
-        expect(before.cells[3]![1]).toBe("Diana Prince");
-        expect(after.cells[7]![1]).toBe("Hank Davis");
+        // Physical lines: Alice is line 2 of both files, Diana line 5 of
+        // before, Hank line 8 of after.
+        const beforeCsv = readLines("sample.before.csv");
+        const afterCsv = readLines("sample.after.csv");
+        expect(before.cells[0]).toEqual(beforeCsv[1]!.split(","));
+        expect(after.cells[0]).toEqual(afterCsv[1]!.split(","));
+        expect(before.cells[3]![1]).toBe(beforeCsv[4]!.split(",")[1]);
+        expect(after.cells[7]![1]).toBe(afterCsv[7]!.split(",")[1]);
       });
 
       it("marks only the edited cells (Alice: email, salary) and none for unchanged Bob", () => {
@@ -338,20 +351,10 @@ describe("pipeline: fixture to rendered table", () => {
   describe.each(["preview-commit-split", "preview-commit-unified"])(
     "wide.csv from %s",
     (fixture) => {
-      let lines: DiffLine[];
-      let rendered: HTMLElement;
-      let before: SideRows;
-      let after: SideRows;
-
-      beforeAll(() => {
-        lines = extractDiffLinesFromDom(
-          loadContainer(fixture, 'div[role="region"]'),
-          PREVIEW_UI,
-        );
-        rendered = renderDiffTable(diffToCsv(lines));
-        before = sideRows(rendered, 0);
-        after = sideRows(rendered, 1);
-      });
+      const { lines, rendered, before, after } = renderFixture(
+        fixture,
+        PREVIEW,
+      );
 
       it("includes line 1 in the diff, so no external headers are needed", () => {
         expect(getFirstLineNumbers(lines).firstBeforeLine).toBe(1);
