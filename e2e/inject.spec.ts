@@ -6,6 +6,7 @@ import {
   fixtureHtml,
   fixturePage,
   openFixture,
+  prPath,
   test,
 } from "./fixtures";
 
@@ -52,6 +53,32 @@ test("Preview UI commit page: injects the toggle, hides the raw diff and applies
     "display",
     "flex",
   );
+
+  const rawDisplays = await page
+    .locator('div[role="region"] > :nth-child(2) > :not(.csv-diff-wrapper)')
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).style.display));
+  expect(rawDisplays.length).toBeGreaterThan(0);
+  expect(rawDisplays.every((d) => d === "none")).toBe(true);
+});
+
+test("Preview UI PR page: injects the toggle next to the Viewed button, hides the raw diff and applies extension CSS", async ({
+  page,
+  site,
+}) => {
+  await openFixture(
+    page,
+    site,
+    `${prPath}/changes`,
+    fixturePage("preview-pr-split"),
+  );
+
+  const viewedParent = page.locator("button[aria-pressed]").locator("..");
+  await expect(viewedParent.locator("> :first-child")).toHaveClass(
+    /csv-diff-toggle-btn/,
+  );
+  await expect(page.locator(".csv-diff-toggle-btn")).toHaveCount(1);
+  await expect(page.locator(".csv-diff-wrapper")).toHaveCount(1);
+  await expect(page.locator(".csv-diff-side")).toHaveCount(2);
 
   const rawDisplays = await page
     .locator('div[role="region"] > :nth-child(2) > :not(.csv-diff-wrapper)')
