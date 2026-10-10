@@ -330,7 +330,7 @@ describe("renderDiffTable: column-count change", () => {
     expect(values(bodyRows(el, 1)[0]!)).toEqual(["1", "A", "10"]);
   });
 
-  it("characterization: the padded cell on the short side is marked removed, the new cell changed", () => {
+  it("marks the padded cell on the short side removed and the new cell changed", () => {
     const el = renderDiffTable(diff);
     expect(
       dataCells(bodyRows(el, 0)[0]!).map(hasClass("csv-diff-cell-removed")),
