@@ -76,19 +76,28 @@ filename resolution into `uiConfig`) were dropped: happy-dom and a stubbed
 1. #56 Vitest setup, pure-logic tests, CI workflow, testing policy
 2. #57 renderer and DOM-extraction tests with GitHub fixtures
 3. #59 `rowMatcher.ts` extraction with matcher tests
-4. revisionContext and headerFetcher tests; commit-payload fix
+4. #60 revisionContext and headerFetcher tests; commit-payload fix
+5. Playwright E2E: setup, injection, toggle, SPA navigation, header fetch
 
-## Deferred: Playwright E2E
+## Playwright E2E
 
-Load the production `dist/chrome-mv3` with `chromium.launchPersistentContext`
-(`channel: "chromium"`), intercept `https://github.com/**` with `context.route`
-and fulfill it from local fixture HTML so `location.origin`, the manifest
-`matches`, CSS injection and header-fetch URLs all run as shipped. Do not wait
-for a service worker (the extension has none); detect readiness by the injected
-toggle button. Scenarios: toggle injection and flip, collapsed-file placeholder,
-delayed insertion, synthetic Turbo and `pushState` navigation, snapshot restore,
-header fetch success/failure/both-fail, paired row heights, header/body column
-alignment, synchronized horizontal scroll, sticky offset after scroll, resize.
+The production `dist/chrome-mv3` is loaded with `chromium.launchPersistentContext`
+(`channel: "chromium"`); one `context.route` handler fulfills `https://github.com/**`
+from fixture pages built around the captured containers, serves `/raw/` responses
+from a per-test map, and aborts everything else, so `location.origin`, the manifest
+`matches`, CSS injection and header-fetch URLs all run as shipped. The extension
+has no service worker; readiness is the injected toggle button. Raw responses can
+be held behind a promise so navigation-during-fetch is deterministic.
+
+Covered in layer 5: injection on Classic and Preview pages with a computed-style
+check, non-CSV containers untouched, toggle, `pushState`-only navigation (URL
+polling), Turbo navigation in both directions, same-path body replacement,
+delayed insertion, header fetch success / 404 fallback / navigation during a
+pending fetch.
+
+Remaining for a later layer: collapsed-file placeholder and re-expand, snapshot
+restore, paired row heights, header/body column alignment, synchronized
+horizontal scroll, sticky offset after scroll, resize.
 Firefox is excluded (Playwright cannot load extensions there); the attached
 browser workflow in AGENTS.md remains the manual smoke check. Live github.com
 is never a merge gate.
