@@ -44,12 +44,12 @@ describe("parseDiffRoute", () => {
   });
 
   it.each([
-    ["7", sha7, true],
-    ["40", sha40, true],
-    ["6", "abc123", false],
-    ["41", `${sha40}0`, false],
-    ["non-hex", "abc123g", false],
-  ])("commit sha of length %s: accepted=%s", (_label, sha, accepted) => {
+    [sha7, true],
+    [sha40, true],
+    ["abc123", false],
+    [`${sha40}0`, false],
+    ["abc123g", false],
+  ])("commit sha %s: accepted=%s", (sha, accepted) => {
     expect(parseDiffRoute(`/o/r/commit/${sha}`)).toEqual(
       accepted ? { kind: "commit", sha } : null,
     );
