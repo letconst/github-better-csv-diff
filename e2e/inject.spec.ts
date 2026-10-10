@@ -87,6 +87,29 @@ test("Preview UI PR page: injects the toggle next to the Viewed button, hides th
   expect(rawDisplays.every((d) => d === "none")).toBe(true);
 });
 
+test("Preview UI PR page: finds the Viewed button's parent without the More options fallback", async ({
+  page,
+  site,
+}) => {
+  const withoutKebab = fixtureHtml("preview-pr-split").replace(
+    /<button(?:(?!<\/button>).)*<\/button><span[^>]*>More options<\/span>/s,
+    "",
+  );
+  expect(withoutKebab).not.toContain("More options");
+  await openFixture(
+    page,
+    site,
+    `${prPath}/changes`,
+    documentWith(withoutKebab),
+  );
+
+  const viewedParent = page.locator("button[aria-pressed]").locator("..");
+  await expect(viewedParent.locator("> :first-child")).toHaveClass(
+    /csv-diff-toggle-btn/,
+  );
+  await expect(page.locator(".csv-diff-toggle-btn")).toHaveCount(1);
+});
+
 test("leaves non-CSV files untouched and processes an uppercase .TSV extension", async ({
   page,
   site,

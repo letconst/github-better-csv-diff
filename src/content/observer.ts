@@ -604,19 +604,13 @@ function resolveFinalMode(
   return { mode: "default" };
 }
 
-/** Find the actions area in the header, with fallback for Preview UI. */
+/** Find the actions area in the header, with fallbacks for commit pages and Classic UI. */
 function findActionsArea(
   header: HTMLElement,
   config: UiConfig,
 ): HTMLElement | null {
   const area = header.querySelector<HTMLElement>(config.actionsSelector);
   if (area) return area;
-
-  // Fallback for Preview UI: locate via the "Viewed" button (aria-pressed toggle)
-  const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
-  if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
-    return viewedBtn.parentElement;
-  }
 
   // Fallback for commit page: locate via "More options" button's parent container.
   // The button may use aria-label or aria-labelledby (PR commit pages use the latter).
