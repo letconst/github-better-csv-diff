@@ -36,6 +36,22 @@ jobs:
       - id: manifest
         run: node scripts/check-manifest.mjs
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - id: e2e
+        run: pnpm test:e2e
+
+      - if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+
       - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         name: Collapse previous test comments
         continue-on-error: true
@@ -78,5 +94,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || steps.typecheck.outcome == 'failure' && 'Type check' || steps.test.outcome == 'failure' && 'Tests' || steps.build.outcome == 'failure' && 'Chrome build' || steps.build-firefox.outcome == 'failure' && 'Firefox build' || steps.manifest.outcome == 'failure' && 'Manifest check' || 'Setup' }}
+          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || steps.typecheck.outcome == 'failure' && 'Type check' || steps.test.outcome == 'failure' && 'Tests' || steps.build.outcome == 'failure' && 'Chrome build' || steps.build-firefox.outcome == 'failure' && 'Firefox build' || steps.manifest.outcome == 'failure' && 'Manifest check' || steps.e2e.outcome == 'failure' && 'E2E' || 'Setup' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
