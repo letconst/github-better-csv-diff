@@ -116,6 +116,16 @@ describe("getRevisionContext", () => {
       });
     });
 
+    it("reads the live commitRoute shape", () => {
+      addJson({
+        commitRoute: { commit: { oid: "full-oid", parents: [PARENT] } },
+      });
+      expect(getRevisionContext()).toMatchObject({
+        baseRef: PARENT,
+        headRef: "full-oid",
+      });
+    });
+
     it("characterization: reads the legacy shape with object parents", () => {
       addJson({ commit: { oid: "full-oid", parents: [{ oid: PARENT }] } });
       expect(getRevisionContext()).toMatchObject({

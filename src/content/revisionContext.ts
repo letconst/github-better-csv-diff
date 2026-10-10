@@ -111,7 +111,8 @@ function extractCommitRefs(): {
   headRef: string | null;
 } | null {
   return extractFromEmbeddedJson("commit", (payload) => {
-    const commit = payload?.commit as
+    const commit = (payload.commit ??
+      (payload.commitRoute as { commit?: unknown } | undefined)?.commit) as
       | { parents?: unknown; oid?: string }
       | undefined;
     if (!commit) return null;
