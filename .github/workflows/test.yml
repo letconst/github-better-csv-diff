@@ -1,13 +1,12 @@
-name: Lint
+name: Test
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
-  lint:
+  test:
     permissions:
       contents: read
       pull-requests: write
@@ -25,8 +24,36 @@ jobs:
       - id: typecheck
         run: pnpm typecheck
 
+      - id: test
+        run: pnpm test
+
+      - id: build
+        run: pnpm build
+
+      - id: build-firefox
+        run: pnpm build:firefox
+
+      - id: manifest
+        run: node scripts/check-manifest.mjs
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - id: e2e
+        run: pnpm test:e2e
+
+      - if: failure() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+
       - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
-        name: Collapse previous lint comments
+        name: Collapse previous test comments
         continue-on-error: true
         run: |
           gh api graphql -f query='
@@ -42,7 +69,7 @@ jobs:
                -f repo="${GITHUB_REPOSITORY#*/}" \
                -F pr="$PR_NUMBER" \
             --jq '.data.repository.pullRequest.comments.nodes[]
-              | select(.body | contains("<!-- lint-result -->"))
+              | select(.body | contains("<!-- test-result -->"))
               | select(.isMinimized == false)
               | .id' \
           | while read -r node_id; do
@@ -61,11 +88,11 @@ jobs:
         name: Comment check failure
         continue-on-error: true
         run: |
-          gh pr comment "$PR_NUMBER" --body "<!-- lint-result -->
+          gh pr comment "$PR_NUMBER" --body "<!-- test-result -->
           > [!WARNING]
-          > **$FAILED failed** — $HINT"
+          > **$FAILED failed** — see the [workflow run]($RUN_URL)."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || 'Type check' }}
-          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `pnpm lint:fix` to auto-fix.' || 'Run `pnpm typecheck` to see the errors.' }}
+          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || steps.typecheck.outcome == 'failure' && 'Type check' || steps.test.outcome == 'failure' && 'Tests' || steps.build.outcome == 'failure' && 'Chrome build' || steps.build-firefox.outcome == 'failure' && 'Firefox build' || steps.manifest.outcome == 'failure' && 'Manifest check' || steps.e2e.outcome == 'failure' && 'E2E' || 'Setup' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -1,0 +1,194 @@
+import type { Page } from "@playwright/test";
+import {
+  commitPath,
+  expect,
+  filesPath,
+  fixtureHtml,
+  fixturePage,
+  openFixture,
+  test,
+} from "./fixtures";
+
+declare global {
+  interface Window {
+    __pristine?: string;
+  }
+}
+
+const fileContainer = "div.file.js-file[data-tagsearch-path]";
+const classicHtml = fixtureHtml("classic-pr-split");
+
+/** Records the raw markup of `selector` at DOMContentLoaded, before any injection. */
+async function capturePristine(page: Page, selector: string) {
+  await page.addInitScript((sel) => {
+    document.addEventListener("DOMContentLoaded", () => {
+      window.__pristine = document.querySelector(sel)?.innerHTML;
+    });
+  }, selector);
+}
+
+const readPristine = (page: Page) =>
+  page.evaluate(() => window.__pristine as string);
+
+let extraContainers = 0;
+
+/**
+ * Appends another CSV container and waits for its toggle: once that appears the
+ * observer has processed the mutation batch that preceded it.
+ */
+async function awaitObserverPass(page: Page) {
+  const extraPath = `example/extra${extraContainers++}.csv`;
+  await page.evaluate(
+    ({ html, from, to }) => {
+      document.body.insertAdjacentHTML("beforeend", html.replace(from, to));
+    },
+    {
+      html: classicHtml,
+      from: 'data-tagsearch-path="example/sample.csv"',
+      to: `data-tagsearch-path="${extraPath}"`,
+    },
+  );
+  await expect(
+    page.locator(`[data-tagsearch-path="${extraPath}"] .csv-diff-toggle-btn`),
+  ).toHaveCount(1);
+}
+
+test("Classic collapse only hides the body: toggle and wrapper stay, no placeholder", async ({
+  page,
+  site,
+}) => {
+  await openFixture(page, site, filesPath, fixturePage("classic-pr-split"));
+  const original = page.locator(
+    `${fileContainer}[data-tagsearch-path="example/sample.csv"]`,
+  );
+  const wrapper = original.locator(".csv-diff-wrapper");
+  const button = original.locator(".csv-diff-toggle-btn");
+
+  await page.evaluate(() => {
+    const file = document.querySelector(".js-file")!;
+    file.classList.remove("open");
+    document.querySelector<HTMLElement>(".js-file-content")!.style.display =
+      "none";
+    document.body.append(document.createElement("p"));
+  });
+  await awaitObserverPass(page);
+
+  await expect(wrapper).toHaveCount(1);
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeEnabled();
+
+  await page.evaluate(() => {
+    document.querySelector(".js-file")!.classList.add("open");
+    document.querySelector<HTMLElement>(".js-file-content")!.style.display = "";
+  });
+  await awaitObserverPass(page);
+
+  await expect(wrapper).toBeVisible();
+  await expect(button).toHaveCount(1);
+  await button.click();
+  await expect(wrapper).toBeHidden();
+});
+
+test("Preview collapse with header actions re-rendered (assumption, unverified on live GitHub) shows a disabled placeholder and recovers on re-expand", async ({
+  page,
+  site,
+}) => {
+  const body = 'div[role="region"] > :nth-child(2)';
+  await capturePristine(page, body);
+  await openFixture(
+    page,
+    site,
+    commitPath,
+    fixturePage("preview-commit-split"),
+  );
+  const pristine = await readPristine(page);
+  const wrapper = page.locator(".csv-diff-wrapper");
+  const button = page.locator(".csv-diff-toggle-btn");
+
+  await page.evaluate((sel) => {
+    document.querySelector(".csv-diff-toggle-btn")!.remove();
+    document.querySelector(sel)!.replaceChildren();
+  }, body);
+
+  await expect(wrapper).toHaveCount(0);
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAttribute("aria-disabled", "true");
+  await expect(button).toHaveAttribute("title", /Expand the file/);
+  await expect(button).not.toHaveClass(/csv-diff-toggle-active/);
+
+  const restored = await page.evaluate(
+    ({ sel, html }) => {
+      const el = document.querySelector(sel)!;
+      el.innerHTML = html;
+      return {
+        wrappers: el.querySelectorAll(".csv-diff-wrapper").length,
+        tables: el.querySelectorAll("table").length,
+      };
+    },
+    { sel: body, html: pristine },
+  );
+  expect(restored).toEqual({ wrappers: 0, tables: 1 });
+
+  await expect(wrapper).toHaveCount(1);
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveClass(/csv-diff-toggle-active/);
+  await button.click();
+  await expect(wrapper).toBeHidden();
+});
+
+test("snapshot restore replaces the stale wrapper and re-attaches a working toggle", async ({
+  page,
+  site,
+}) => {
+  await openFixture(page, site, filesPath, fixturePage("classic-pr-split"));
+  await page.evaluate(() => {
+    document
+      .querySelector(".csv-diff-wrapper")!
+      .setAttribute("data-stale", "1");
+  });
+
+  await page.evaluate((selector) => {
+    document.dispatchEvent(new Event("turbo:before-cache"));
+    const container = document.querySelector(selector)!;
+    container.replaceWith(container.cloneNode(true));
+    document.dispatchEvent(new Event("turbo:load"));
+  }, fileContainer);
+
+  const wrapper = page.locator(".csv-diff-wrapper");
+  const button = page.locator(".csv-diff-toggle-btn");
+  await expect(wrapper).toHaveCount(1);
+  await expect(wrapper).not.toHaveAttribute("data-stale", "1");
+  await expect(button).toHaveCount(1);
+  await expect(wrapper).toBeVisible();
+  const rawChild = page
+    .locator(".js-file-content > :not(.csv-diff-wrapper)")
+    .first();
+  await expect(rawChild).toHaveCSS("display", "none");
+
+  await button.click();
+  await expect(wrapper).toBeHidden();
+  await expect(rawChild).not.toHaveCSS("display", "none");
+});
+
+test("unrelated DOM mutations leave exactly one wrapper and one toggle", async ({
+  page,
+  site,
+}) => {
+  await openFixture(page, site, filesPath, fixturePage("classic-pr-split"));
+  const original = page.locator(
+    `${fileContainer}[data-tagsearch-path="example/sample.csv"]`,
+  );
+
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => {
+      const p = document.createElement("p");
+      document.body.append(p);
+      p.remove();
+    });
+    await awaitObserverPass(page);
+    await expect(original.locator(".csv-diff-wrapper")).toHaveCount(1);
+    await expect(original.locator(".csv-diff-toggle-btn")).toHaveCount(1);
+  }
+});
