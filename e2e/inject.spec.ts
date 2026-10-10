@@ -5,6 +5,7 @@ import {
   filesPath,
   fixtureHtml,
   fixturePage,
+  openFixture,
   test,
 } from "./fixtures";
 
@@ -12,8 +13,7 @@ test("Classic UI: injects the toggle, hides the raw diff and applies extension C
   page,
   site,
 }) => {
-  site.pages.set(filesPath, fixturePage("classic-pr-split"));
-  await page.goto(filesPath);
+  await openFixture(page, site, filesPath, fixturePage("classic-pr-split"));
 
   await expect(page.locator(".file-actions .csv-diff-toggle-btn")).toHaveCount(
     1,
@@ -36,8 +36,12 @@ test("Preview UI commit page: injects the toggle, hides the raw diff and applies
   page,
   site,
 }) => {
-  site.pages.set(commitPath, fixturePage("preview-commit-split"));
-  await page.goto(commitPath);
+  await openFixture(
+    page,
+    site,
+    commitPath,
+    fixturePage("preview-commit-split"),
+  );
 
   await expect(
     page.locator('div[class*="diffHeaderWrapper"] .csv-diff-toggle-btn'),

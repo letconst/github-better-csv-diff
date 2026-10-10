@@ -1,11 +1,10 @@
-import { expect, filesPath, fixturePage, test } from "./fixtures";
+import { expect, filesPath, fixturePage, openFixture, test } from "./fixtures";
 
 test("toggle flips between the table view and the raw diff", async ({
   page,
   site,
 }) => {
-  site.pages.set(filesPath, fixturePage("classic-pr-split"));
-  await page.goto(filesPath);
+  await openFixture(page, site, filesPath, fixturePage("classic-pr-split"));
 
   const button = page.locator(".csv-diff-toggle-btn");
   const wrapper = page.locator(".csv-diff-wrapper");

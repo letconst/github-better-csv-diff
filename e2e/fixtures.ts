@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { type BrowserContext, test as base, chromium } from "@playwright/test";
+import {
+  type BrowserContext,
+  test as base,
+  chromium,
+  type Page,
+} from "@playwright/test";
 
 export const prPath = "/letconst/github-better-csv-diff/pull/2";
 export const filesPath = `${prPath}/files`;
@@ -17,7 +22,7 @@ interface RawResponse {
   release?: Promise<void>;
 }
 
-interface Site {
+export interface Site {
   pages: Map<string, string>;
   raw: Map<string, RawResponse>;
   rawRequests: string[];
@@ -38,8 +43,10 @@ export function fixtureHtml(name: string): string {
   );
 }
 
-const stickyFileHeader =
-  "<style>.file-header{position:sticky;top:60px}</style>";
+/** GitHub pins the file header this far from the viewport top. */
+export const stickyTop = 60;
+
+const stickyFileHeader = `<style>.file-header{position:sticky;top:${stickyTop}px}</style>`;
 
 export function documentWith(body: string): string {
   return `<!doctype html><html><head><meta charset="utf-8">${stickyFileHeader}</head><body>${body}</body></html>`;
@@ -47,6 +54,21 @@ export function documentWith(body: string): string {
 
 export function fixturePage(name: string): string {
   return documentWith(fixtureHtml(name));
+}
+
+/** Serve `html` at `path`, load it and wait for the extension to inject a wrapper. */
+export async function openFixture(
+  page: Page,
+  site: Site,
+  path: string,
+  html: string,
+): Promise<void> {
+  site.pages.set(path, html);
+  await page.goto(path);
+  await page
+    .locator(".csv-diff-wrapper")
+    .first()
+    .waitFor({ state: "attached" });
 }
 
 const rawPathPattern = /^\/[^/]+\/[^/]+\/raw\//;
