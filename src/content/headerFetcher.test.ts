@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
 import type { Window as HappyWindow } from "happy-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { clearHeaderCache, fetchCsvHeaderRow } from "./headerFetcher";
 
 const fetchMock = vi.fn();
@@ -12,21 +20,23 @@ const rangeOf = (call: number): string =>
 function serveFile(file: string): void {
   fetchMock.mockImplementation(async (_url, init) => {
     const end = Number(/bytes=0-([0-9]+)/.exec(init.headers.Range)![1]);
-    return end + 1 < file.length
-      ? partial(file.slice(0, end + 1))
-      : new Response(file, { status: 206 });
+    return partial(file.slice(0, end + 1));
   });
 }
 
+(window as unknown as HappyWindow).happyDOM.setURL("https://github.com/x");
+vi.stubGlobal("fetch", fetchMock);
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
-  (window as unknown as HappyWindow).happyDOM.setURL("https://github.com/x");
   fetchMock.mockReset();
-  vi.stubGlobal("fetch", fetchMock);
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   clearHeaderCache();
   vi.restoreAllMocks();
 });
