@@ -10,6 +10,7 @@ its markup, refresh these and review the test expectations separately.
 | `preview-commit-unified.html` | same commit, `?diff=unified` | Preview UI, unified | 2026-10-10 |
 | `classic-pr-split.html` | `/letconst/github-better-csv-diff/pull/2/files?diff=split`, `div.file.js-file[data-tagsearch-path="example/sample.csv"]` | Classic UI, split | 2026-10-10 |
 | `classic-pr-unified.html` | same PR, `?diff=unified` | Classic UI, unified | 2026-10-10 |
+| `classic-pr-split-large-file.html` | same PR, `?diff=split`, `div.file.js-file[data-tagsearch-path="example/large-file.csv"]` (diff starts at line 24) | Classic UI, split | 2026-10-10 |
 
 Revisions: PR #2 compares `96e7fb85` (main) to `20765189` (test/csv-diff-demo).
 The commit page shows commit `20765189` (parent `20765189^`).
