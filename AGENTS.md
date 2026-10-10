@@ -63,6 +63,7 @@ To verify extension behavior in the browser, use `playwright-cli attach --extens
 
 - Stack: Vitest + happy-dom. Tests are colocated as `src/**/*.test.ts`; run with `pnpm test`.
 - E2E: Playwright loads the production `dist/chrome-mv3` and serves fixture pages at `https://github.com/...` through request interception, so the manifest `matches`, CSS injection and header-fetch URLs run as shipped. Run `pnpm build && pnpm test:e2e`. The extension has no service worker; readiness is the injected toggle button.
+- Live DOM check: `e2e-live/` runs the production build against real, logged-out github.com pages (PR #2 and the `example/wide.csv` commit) with no interception, weekly via `.github/workflows/live-dom-check.yml`, which files an issue on failure. Run locally with `pnpm build && pnpm test:e2e:live`. `example/sample.csv` on PR #2 and `example/wide.csv` in the commit must stay in sync with `test/fixtures/csv`.
 - Tests assert public contracts only: exported functions and rendered DOM semantics (CSS classes, text). Never test private helpers or export them just for tests. No snapshot tests.
 - Derive expectations independently of the implementation, from a reviewable source (AGENTS.md, an issue, a plan file, a PR description). Never generate them by running the code under test.
 - Behavior without such a source is pinned with a `characterization:` test name so it is not mistaken for spec.

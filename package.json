@@ -22,7 +22,8 @@
     "lint:fix": "biome check --fix .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:live": "playwright test -c playwright.live.config.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

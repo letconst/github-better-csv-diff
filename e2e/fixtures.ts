@@ -6,6 +6,7 @@ import {
   chromium,
   type Page,
 } from "@playwright/test";
+import Papa from "papaparse";
 
 export const prPath = "/letconst/github-better-csv-diff/pull/2";
 export const filesPath = `${prPath}/files`;
@@ -41,6 +42,14 @@ export function fixtureHtml(name: string): string {
     path.join(repoRoot, "test", "fixtures", "github", `${name}.html`),
     "utf8",
   );
+}
+
+export function fixtureCsv(name: string): string[][] {
+  const text = fs.readFileSync(
+    path.join(repoRoot, "test", "fixtures", "csv", name),
+    "utf8",
+  );
+  return Papa.parse<string[]>(text, { skipEmptyLines: true }).data;
 }
 
 /** GitHub pins the file header this far from the viewport top. */
