@@ -1,13 +1,12 @@
-name: Lint
+name: Test
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
-  lint:
+  test:
     permissions:
       contents: read
       pull-requests: write
@@ -25,8 +24,20 @@ jobs:
       - id: typecheck
         run: pnpm typecheck
 
+      - id: test
+        run: pnpm test
+
+      - id: build
+        run: pnpm build
+
+      - id: build-firefox
+        run: pnpm build:firefox
+
+      - id: manifest
+        run: node scripts/check-manifest.mjs
+
       - if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
-        name: Collapse previous lint comments
+        name: Collapse previous test comments
         continue-on-error: true
         run: |
           gh api graphql -f query='
@@ -42,7 +53,7 @@ jobs:
                -f repo="${GITHUB_REPOSITORY#*/}" \
                -F pr="$PR_NUMBER" \
             --jq '.data.repository.pullRequest.comments.nodes[]
-              | select(.body | contains("<!-- lint-result -->"))
+              | select(.body | contains("<!-- test-result -->"))
               | select(.isMinimized == false)
               | .id' \
           | while read -r node_id; do
@@ -61,11 +72,11 @@ jobs:
         name: Comment check failure
         continue-on-error: true
         run: |
-          gh pr comment "$PR_NUMBER" --body "<!-- lint-result -->
+          gh pr comment "$PR_NUMBER" --body "<!-- test-result -->
           > [!WARNING]
           > **$FAILED failed** — $HINT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || 'Type check' }}
-          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `pnpm lint:fix` to auto-fix.' || 'Run `pnpm typecheck` to see the errors.' }}
+          FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || steps.typecheck.outcome == 'failure' && 'Type check' || steps.test.outcome == 'failure' && 'Tests' || steps.build.outcome == 'failure' && 'Chrome build' || steps.build-firefox.outcome == 'failure' && 'Firefox build' || steps.manifest.outcome == 'failure' && 'Manifest check' || 'Setup' }}
+          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `pnpm lint:fix` to auto-fix.' || steps.typecheck.outcome == 'failure' && 'Run `pnpm typecheck` to see the errors.' || steps.test.outcome == 'failure' && 'Run `pnpm test` to see the failures.' || steps.build.outcome == 'failure' && 'Run `pnpm build` to see the errors.' || steps.build-firefox.outcome == 'failure' && 'Run `pnpm build:firefox` to see the errors.' || steps.manifest.outcome == 'failure' && 'Run `pnpm build && pnpm build:firefox && node scripts/check-manifest.mjs`.' || 'Check the workflow log for the setup step that failed.' }}
