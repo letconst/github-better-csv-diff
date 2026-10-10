@@ -36,6 +36,17 @@ function csvDiff(
   return { before, after, beforeLineNumbers, afterLineNumbers, alignment };
 }
 
+const unchangedDiff = (before: string[][], after: string[][]): CsvDiff => {
+  const numbers = (rows: string[][]) => rows.map((_, i) => i + 1);
+  return csvDiff(
+    before,
+    after,
+    numbers(before),
+    numbers(after),
+    numbers(before).map((n) => same(n, n)),
+  );
+};
+
 const sides = (el: HTMLElement) => [
   ...el.querySelectorAll<HTMLElement>(".csv-diff-side"),
 ];
@@ -63,15 +74,7 @@ const indicators = (td: Element) =>
 
 describe("renderDiffTable: structure", () => {
   it("renders a Before side and an After side", () => {
-    const el = renderDiffTable(
-      csvDiff(
-        [["id"], ["1"]],
-        [["id"], ["1"]],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([["id"], ["1"]], [["id"], ["1"]]));
     expect(el.className).toBe("csv-diff-container");
     expect(
       sides(el).map((s) => s.querySelector(".csv-diff-header")!.textContent),
@@ -80,7 +83,7 @@ describe("renderDiffTable: structure", () => {
 });
 
 describe("renderDiffTable: header modes", () => {
-  const diff = csvDiff(
+  const diff = unchangedDiff(
     [
       ["h1", "h2"],
       ["a", "b"],
@@ -89,11 +92,7 @@ describe("renderDiffTable: header modes", () => {
       ["h1", "h2"],
       ["a", "b"],
     ],
-    [1, 2],
-    [1, 2],
-    [same(1, 1), same(2, 2)],
   );
-  // Hunk that starts mid-file: line 1 is not in the diff.
   const midFile = csvDiff(
     [
       ["a", "b"],
@@ -231,15 +230,7 @@ describe("renderDiffTable: modified rows", () => {
 
   it("leaves an identical row unmarked", () => {
     const row = ["1", "A", "B"];
-    const el = renderDiffTable(
-      csvDiff(
-        [header, row],
-        [header, row],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([header, row], [header, row]));
     expect(rowKind(bodyRows(el, 1)[0]!)).toBe("");
     expect(el.querySelector(".csv-diff-cell-changed")).toBeNull();
     expect(el.querySelector(".csv-diff-cell-removed")).toBeNull();
@@ -306,8 +297,8 @@ describe("renderDiffTable: added and removed rows", () => {
 });
 
 describe("renderDiffTable: column-count change", () => {
-  // After gains a column. The header lines differ, so the header is a
-  // removed+added pair that falls outside the data rows.
+  // The header lines differ, so the header is a removed+added pair that falls
+  // outside the data rows.
   const diff = csvDiff(
     [
       ["id", "name"],
@@ -346,15 +337,7 @@ describe("renderDiffTable: multiline cells", () => {
 
   it("renders each newline of an unchanged cell as <br> plus an indicator", () => {
     const row = ["1", "a\nb\nc"];
-    const el = renderDiffTable(
-      csvDiff(
-        [header, row],
-        [header, row],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([header, row], [header, row]));
     for (const i of [0, 1] as const) {
       const td = dataCells(bodyRows(el, i)[0]!)[1]!;
       expect(brCount(td)).toBe(2);
@@ -400,30 +383,14 @@ describe("renderDiffTable: multiline cells", () => {
 
   it("treats CRLF as one newline", () => {
     const row = ["1", "a\r\nb"];
-    const el = renderDiffTable(
-      csvDiff(
-        [header, row],
-        [header, row],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([header, row], [header, row]));
     expect(brCount(dataCells(bodyRows(el, 0)[0]!)[1]!)).toBe(1);
   });
 
   it("renders a multiline header cell with <br>", () => {
     const row = ["1", "x"];
     const head = ["id", "two\nlines"];
-    const el = renderDiffTable(
-      csvDiff(
-        [head, row],
-        [head, row],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([head, row], [head, row]));
     expect(brCount(headerCells(el, 0)[2]!)).toBe(1);
   });
 });
@@ -432,15 +399,7 @@ describe("renderDiffTable: cell text is never parsed as HTML", () => {
   it("renders HTML-like text in unchanged and header cells as text", () => {
     const head = ["id", "<i>h</i>"];
     const row = ["1", "<b>x</b>"];
-    const el = renderDiffTable(
-      csvDiff(
-        [head, row],
-        [head, row],
-        [1, 2],
-        [1, 2],
-        [same(1, 1), same(2, 2)],
-      ),
-    );
+    const el = renderDiffTable(unchangedDiff([head, row], [head, row]));
     expect(dataCells(bodyRows(el, 0)[0]!)[1]!.textContent).toBe("<b>x</b>");
     expect(headerCells(el, 0)[2]!.textContent).toBe("<i>h</i>");
     expect(el.querySelector("b, i")).toBeNull();
@@ -617,8 +576,6 @@ describe("renderDiffTable: row matching precedence", () => {
   });
 
   it("a fully reversed replacement block (crossing matches) stays in diff order: removed rows, then added rows", () => {
-    // Key pairing needs a monotonic order; reversed keys are not, so the block
-    // keeps its diff order instead of pairing.
     const el = renderDiffTable(
       csvDiff(
         [header, ["A", "1"], ["B", "2"], ["C", "3"]],
@@ -628,21 +585,38 @@ describe("renderDiffTable: row matching precedence", () => {
         [same(1, 1), gone(2), gone(3), gone(4), came(2), came(3), came(4)],
       ),
     );
-    const e = "csv-diff-row-empty";
-    const r = "csv-diff-row-removed";
-    const a = "csv-diff-row-added";
-    expect(bodyRows(el, 0).map(rowKind)).toEqual([r, r, r, e, e, e]);
-    expect(bodyRows(el, 1).map(rowKind)).toEqual([e, e, e, a, a, a]);
-    expect(
-      bodyRows(el, 0)
-        .slice(0, 3)
-        .map((tr) => values(tr)[0]),
-    ).toEqual(["A", "B", "C"]);
-    expect(
-      bodyRows(el, 1)
-        .slice(3)
-        .map((tr) => values(tr)[0]),
-    ).toEqual(["C", "B", "A"]);
+    expect(bodyRows(el, 0).map(rowKind)).toEqual([
+      "csv-diff-row-removed",
+      "csv-diff-row-removed",
+      "csv-diff-row-removed",
+      "csv-diff-row-empty",
+      "csv-diff-row-empty",
+      "csv-diff-row-empty",
+    ]);
+    expect(bodyRows(el, 1).map(rowKind)).toEqual([
+      "csv-diff-row-empty",
+      "csv-diff-row-empty",
+      "csv-diff-row-empty",
+      "csv-diff-row-added",
+      "csv-diff-row-added",
+      "csv-diff-row-added",
+    ]);
+    expect(bodyRows(el, 0).map((tr) => values(tr)[0])).toEqual([
+      "A",
+      "B",
+      "C",
+      NBSP,
+      NBSP,
+      NBSP,
+    ]);
+    expect(bodyRows(el, 1).map((tr) => values(tr)[0])).toEqual([
+      NBSP,
+      NBSP,
+      NBSP,
+      "C",
+      "B",
+      "A",
+    ]);
   });
 
   it("order fallback: duplicate first-column keys pair by index", () => {
