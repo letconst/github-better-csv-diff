@@ -1,0 +1,53 @@
+name: Live DOM check
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: live-dom-check
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - id: live
+        run: pnpm test:e2e:live
+
+      - if: failure() && steps.live.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-test-results
+          path: test-results/
+
+      - if: failure()
+        name: Report failure
+        run: |
+          gh label create live-dom-check --force
+          issue=$(gh issue list --label live-dom-check --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "Failed again ($WHAT): $RUN_URL"
+          else
+            gh issue create --label live-dom-check --title "Live DOM check failed" \
+              --body "The weekly live DOM check failed ($WHAT): $RUN_URL"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          WHAT: ${{ steps.live.outcome == 'failure' && 'live check failed' || 'setup or build failed' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
