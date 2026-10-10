@@ -6,6 +6,7 @@ import {
   fixtureHtml,
   fixturePage,
   openFixture,
+  prPath,
   test,
 } from "./fixtures";
 
@@ -19,12 +20,19 @@ const fileContainer = "div.file.js-file[data-tagsearch-path]";
 const classicHtml = fixtureHtml("classic-pr-split");
 
 /** Records the raw markup of `selector` at DOMContentLoaded, before any injection. */
-async function capturePristine(page: Page, selector: string) {
-  await page.addInitScript((sel) => {
-    document.addEventListener("DOMContentLoaded", () => {
-      window.__pristine = document.querySelector(sel)?.innerHTML;
-    });
-  }, selector);
+async function capturePristine(
+  page: Page,
+  selector: string,
+  prop: "innerHTML" | "outerHTML" = "innerHTML",
+) {
+  await page.addInitScript(
+    ({ sel, prop }) => {
+      document.addEventListener("DOMContentLoaded", () => {
+        window.__pristine = document.querySelector(sel)?.[prop];
+      });
+    },
+    { sel: selector, prop },
+  );
 }
 
 const readPristine = (page: Page) =>
@@ -89,26 +97,24 @@ test("Classic collapse only hides the body: toggle and wrapper stay, no placehol
   await expect(wrapper).toBeHidden();
 });
 
-test("Preview collapse with header actions re-rendered (assumption, unverified on live GitHub) shows a disabled placeholder and recovers on re-expand", async ({
+test("Preview collapse removes the body: the surviving toggle becomes a disabled placeholder and re-expand re-processes", async ({
   page,
   site,
 }) => {
-  const body = 'div[role="region"] > :nth-child(2)';
-  await capturePristine(page, body);
+  const region = 'div[role="region"]';
+  const body = `${region} > :nth-child(2)`;
+  await capturePristine(page, body, "outerHTML");
   await openFixture(
     page,
     site,
-    commitPath,
-    fixturePage("preview-commit-split"),
+    `${prPath}/changes`,
+    fixturePage("preview-pr-split"),
   );
   const pristine = await readPristine(page);
-  const wrapper = page.locator(".csv-diff-wrapper");
-  const button = page.locator(".csv-diff-toggle-btn");
+  const wrapper = page.locator(`${region} .csv-diff-wrapper`);
+  const button = page.locator(`${region} .csv-diff-toggle-btn`);
 
-  await page.evaluate((sel) => {
-    document.querySelector(".csv-diff-toggle-btn")!.remove();
-    document.querySelector(sel)!.replaceChildren();
-  }, body);
+  await page.evaluate((sel) => document.querySelector(sel)!.remove(), body);
 
   await expect(wrapper).toHaveCount(0);
   await expect(button).toHaveCount(1);
@@ -117,18 +123,17 @@ test("Preview collapse with header actions re-rendered (assumption, unverified o
   await expect(button).toHaveAttribute("title", /Expand the file/);
   await expect(button).not.toHaveClass(/csv-diff-toggle-active/);
 
-  const restored = await page.evaluate(
-    ({ sel, html }) => {
-      const el = document.querySelector(sel)!;
-      el.innerHTML = html;
-      return {
-        wrappers: el.querySelectorAll(".csv-diff-wrapper").length,
-        tables: el.querySelectorAll("table").length,
-      };
-    },
-    { sel: body, html: pristine },
+  await button.evaluate((el) => el.setAttribute("data-same-node", ""));
+  await awaitObserverPass(page);
+  await awaitObserverPass(page);
+  await expect(button).toHaveCount(1);
+  await expect(button).toHaveAttribute("data-same-node", "");
+
+  await page.evaluate(
+    ({ sel, html }) =>
+      document.querySelector(sel)!.insertAdjacentHTML("beforeend", html),
+    { sel: region, html: pristine },
   );
-  expect(restored).toEqual({ wrappers: 0, tables: 1 });
 
   await expect(wrapper).toHaveCount(1);
   await expect(button).toHaveCount(1);
@@ -136,6 +141,57 @@ test("Preview collapse with header actions re-rendered (assumption, unverified o
   await expect(button).toHaveClass(/csv-diff-toggle-active/);
   await button.click();
   await expect(wrapper).toBeHidden();
+});
+
+test("Preview collapse in raw mode keeps the Table View placeholder and re-expands in raw mode", async ({
+  page,
+  site,
+}) => {
+  const region = 'div[role="region"]';
+  const body = `${region} > :nth-child(2)`;
+  await capturePristine(page, body, "outerHTML");
+  await openFixture(
+    page,
+    site,
+    `${prPath}/changes`,
+    fixturePage("preview-pr-split"),
+  );
+  const pristine = await readPristine(page);
+  const wrapper = page.locator(`${region} .csv-diff-wrapper`);
+  const button = page.locator(`${region} .csv-diff-toggle-btn`);
+
+  await button.click();
+  await expect(wrapper).toBeHidden();
+  await expect(button).toHaveText("Table View");
+
+  await page.evaluate((sel) => document.querySelector(sel)!.remove(), body);
+
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveText("Table View");
+  await expect(button).not.toHaveClass(/csv-diff-toggle-active/);
+
+  await page.evaluate(
+    ({ sel, html }) =>
+      document.querySelector(sel)!.insertAdjacentHTML("beforeend", html),
+    { sel: region, html: pristine },
+  );
+
+  await expect(wrapper).toHaveCount(1);
+  await expect(wrapper).toBeHidden();
+  await expect(page.locator(region)).toHaveAttribute("data-csv-diff-raw", "");
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText("Table View");
+  const rawDisplays = await page
+    .locator(`${body} > :not(.csv-diff-wrapper)`)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).style.display));
+  expect(rawDisplays.length).toBeGreaterThan(0);
+  expect(rawDisplays.every((d) => d !== "none")).toBe(true);
+
+  await button.click();
+  await expect(wrapper).toBeVisible();
+  await expect(button).toHaveText("Raw Diff");
 });
 
 test("snapshot restore replaces the stale wrapper and re-attaches a working toggle", async ({

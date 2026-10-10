@@ -94,70 +94,76 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("extractDiffLinesFromDom: Classic UI (sample.csv, PR #2)", () => {
-  const {
-    unchanged: u,
-    removed: r,
-    added: a,
-  } = diffLineFactory("sample.before.csv", "sample.after.csv");
+describe.each<[string, UiFixture, string, string]>([
+  ["Classic UI", CLASSIC, "classic-pr-unified", "classic-pr-split"],
+  ["Preview UI", PREVIEW, "preview-pr-unified", "preview-pr-split"],
+])(
+  "extractDiffLinesFromDom: %s (sample.csv, PR #2)",
+  (_ui, ui, unifiedFixture, splitFixture) => {
+    const {
+      unchanged: u,
+      removed: r,
+      added: a,
+    } = diffLineFactory("sample.before.csv", "sample.after.csv");
 
-  // Unified lists every removal of a change block before its additions.
-  // The hunk header row yields nothing.
-  const unifiedExpected = [
-    u(1, 1),
-    r(2),
-    a(2),
-    u(3, 3),
-    r(4),
-    r(5),
-    a(4),
-    u(6, 5),
-    r(7),
-    a(6),
-    a(7),
-    a(8),
-  ];
+    // Unified lists every removal of a change block before its additions.
+    // The hunk header row yields nothing.
+    const unifiedExpected = [
+      u(1, 1),
+      r(2),
+      a(2),
+      u(3, 3),
+      r(4),
+      r(5),
+      a(4),
+      u(6, 5),
+      r(7),
+      a(6),
+      a(7),
+      a(8),
+    ];
 
-  // Split puts a removed line and its replacement on one row, so Diana's
-  // deletion (own row) follows the Charlie/Charles pair.
-  const splitExpected = [
-    u(1, 1),
-    r(2),
-    a(2),
-    u(3, 3),
-    r(4),
-    a(4),
-    r(5),
-    u(6, 5),
-    r(7),
-    a(6),
-    a(7),
-    a(8),
-  ];
+    // Split puts a removed line and its replacement on one row, so Diana's
+    // deletion (own row) follows the Charlie/Charles pair.
+    const splitExpected = [
+      u(1, 1),
+      r(2),
+      a(2),
+      u(3, 3),
+      r(4),
+      a(4),
+      r(5),
+      u(6, 5),
+      r(7),
+      a(6),
+      a(7),
+      a(8),
+    ];
 
-  it("extracts every unified line in order, skipping the hunk row", () => {
-    expect(extracted("classic-pr-unified", CLASSIC)).toEqual(unifiedExpected);
-  });
+    it("extracts every unified line in order, skipping the hunk row", () => {
+      expect(extracted(unifiedFixture, ui)).toEqual(unifiedExpected);
+    });
 
-  it("extracts every split line in order, skipping the hunk row", () => {
-    expect(extracted("classic-pr-split", CLASSIC)).toEqual(splitExpected);
-  });
+    it("extracts every split line in order, skipping the hunk row", () => {
+      expect(extracted(splitFixture, ui)).toEqual(splitExpected);
+    });
 
-  // Strict DiffLine[] equality does not hold: the two layouts order a change
-  // block differently. What must hold is that both reconstruct the same files.
-  it("reconstructs the same before and after files from either layout", () => {
-    const split = extracted("classic-pr-split", CLASSIC);
-    const unified = extracted("classic-pr-unified", CLASSIC);
-    expect(beforeSide(split)).toEqual(beforeSide(unified));
-    expect(afterSide(split)).toEqual(afterSide(unified));
-    expect(beforeSide(split).map((l) => l.content)).toEqual(
-      readLines("sample.before.csv"),
-    );
-    expect(afterSide(split).map((l) => l.content)).toEqual(
-      readLines("sample.after.csv"),
-    );
-  });
-});
+    // Strict DiffLine[] equality does not hold: the two layouts order a change
+    // block differently. What must hold is that both reconstruct the same files.
+    it("reconstructs the same before and after files from either layout", () => {
+      const split = extracted(splitFixture, ui);
+      const unified = extracted(unifiedFixture, ui);
+      expect(beforeSide(split)).toEqual(beforeSide(unified));
+      expect(afterSide(split)).toEqual(afterSide(unified));
+      expect(beforeSide(split).map((l) => l.content)).toEqual(
+        readLines("sample.before.csv"),
+      );
+      expect(afterSide(split).map((l) => l.content)).toEqual(
+        readLines("sample.after.csv"),
+      );
+    });
+  },
+);
 
 describe("extractDiffLinesFromDom: Preview UI (wide.csv, commit 20765189)", () => {
   const {
@@ -263,88 +269,78 @@ describe("pipeline: fixture to rendered table", () => {
         [index]!.querySelectorAll(".csv-diff-header-table th"),
     ].map((th) => th.textContent);
 
-  describe.each(["classic-pr-split", "classic-pr-unified"])(
-    "sample.csv from %s",
-    (fixture) => {
-      const { lines, rendered, before, after } = renderFixture(
-        fixture,
-        CLASSIC,
-      );
+  describe.each<[string, UiFixture]>([
+    ["classic-pr-split", CLASSIC],
+    ["classic-pr-unified", CLASSIC],
+    ["preview-pr-split", PREVIEW],
+    ["preview-pr-unified", PREVIEW],
+  ])("sample.csv from %s", (fixture, ui) => {
+    const { lines, rendered, before, after } = renderFixture(fixture, ui);
 
-      it("includes line 1 in the diff, so the in-diff header is used", () => {
-        expect(getFirstLineNumbers(lines)).toEqual({
-          firstBeforeLine: 1,
-          firstAfterLine: 1,
-        });
-        const header = ["#", ...readLines("sample.before.csv")[0]!.split(",")];
-        expect(headerTexts(rendered, 0)).toEqual(header);
-        expect(headerTexts(rendered, 1)).toEqual(header);
+    it("includes line 1 in the diff, so the in-diff header is used", () => {
+      expect(getFirstLineNumbers(lines)).toEqual({
+        firstBeforeLine: 1,
+        firstAfterLine: 1,
       });
+      const header = ["#", ...readLines("sample.before.csv")[0]!.split(",")];
+      expect(headerTexts(rendered, 0)).toEqual(header);
+      expect(headerTexts(rendered, 1)).toEqual(header);
+    });
 
-      it("renders Diana as removed and Grace/Hank as added, the rest paired in place", () => {
-        // Rows: Alice, Bob, Charlie, Diana, Eve, Frank, Grace, Hank.
-        expect(before.classes).toEqual([
-          "",
-          "",
-          "",
-          "csv-diff-row-removed",
-          "",
-          "",
-          "csv-diff-row-empty",
-          "csv-diff-row-empty",
-        ]);
-        expect(after.classes).toEqual([
-          "",
-          "",
-          "",
-          "csv-diff-row-empty",
-          "",
-          "",
-          "csv-diff-row-added",
-          "csv-diff-row-added",
-        ]);
-      });
+    it("renders Diana as removed and Grace/Hank as added, the rest paired in place", () => {
+      // Rows: Alice, Bob, Charlie, Diana, Eve, Frank, Grace, Hank.
+      expect(before.classes).toEqual([
+        "",
+        "",
+        "",
+        "csv-diff-row-removed",
+        "",
+        "",
+        "csv-diff-row-empty",
+        "csv-diff-row-empty",
+      ]);
+      expect(after.classes).toEqual([
+        "",
+        "",
+        "",
+        "csv-diff-row-empty",
+        "",
+        "",
+        "csv-diff-row-added",
+        "csv-diff-row-added",
+      ]);
+    });
 
-      it("shows the physical line numbers of each file", () => {
-        expect(before.lineNums).toEqual([
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          NBSP,
-          NBSP,
-        ]);
-        expect(after.lineNums).toEqual([
-          "2",
-          "3",
-          "4",
-          NBSP,
-          "5",
-          "6",
-          "7",
-          "8",
-        ]);
-      });
+    it("shows the physical line numbers of each file", () => {
+      expect(before.lineNums).toEqual([
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        NBSP,
+        NBSP,
+      ]);
+      expect(after.lineNums).toEqual(["2", "3", "4", NBSP, "5", "6", "7", "8"]);
+    });
 
-      it("shows the cell values of each file", () => {
-        // Physical lines: Alice is line 2 of both files, Diana line 5 of
-        // before, Hank line 8 of after.
-        const beforeCsv = readLines("sample.before.csv");
-        const afterCsv = readLines("sample.after.csv");
-        expect(before.cells[0]).toEqual(beforeCsv[1]!.split(","));
-        expect(after.cells[0]).toEqual(afterCsv[1]!.split(","));
-        expect(before.cells[3]![1]).toBe(beforeCsv[4]!.split(",")[1]);
-        expect(after.cells[7]![1]).toBe(afterCsv[7]!.split(",")[1]);
-      });
+    it("shows the cell values of each file", () => {
+      // Physical lines: Alice is line 2 of both files, Diana line 5 of
+      // before, Hank line 8 of after.
+      const beforeCsv = readLines("sample.before.csv");
+      const afterCsv = readLines("sample.after.csv");
+      expect(before.cells[0]).toEqual(beforeCsv[1]!.split(","));
+      expect(after.cells[0]).toEqual(afterCsv[1]!.split(","));
+      expect(before.cells[3]![1]).toBe(beforeCsv[4]!.split(",")[1]);
+      expect(after.cells[7]![1]).toBe(afterCsv[7]!.split(",")[1]);
+    });
 
-      it("marks only the edited cells (Alice: email, salary) and none for unchanged Bob", () => {
-        expect(after.changed[0]).toEqual([false, false, true, false, true]);
-        expect(after.changed[1]).toEqual([false, false, false, false, false]);
-      });
-    },
-  );
+    it("marks only the edited cells (Alice: email, salary) and none for unchanged Bob", () => {
+      expect(after.changed[0]).toEqual([false, false, true, false, true]);
+      expect(after.changed[1]).toEqual([false, false, false, false, false]);
+    });
+  });
 
   // PR #2 lists 1006 as deleted and 1007 as added, but #30 decided that a lone
   // removed+added block is shown as one modified row even when the keys differ.
