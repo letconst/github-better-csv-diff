@@ -21,10 +21,12 @@
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@playwright/test": "^1.64.0",
     "@types/papaparse": "^5.5.2",
     "@wxt-dev/auto-icons": "^1.1.2",
     "esbuild": "^0.28.2",
