@@ -15,11 +15,10 @@ function goTo(path: string): void {
   );
 }
 
-function addJson(payload: unknown): void {
+function addJson(payload: object): void {
   const script = document.createElement("script");
   script.type = "application/json";
-  script.textContent =
-    typeof payload === "string" ? payload : JSON.stringify({ payload });
+  script.textContent = JSON.stringify({ payload });
   document.body.append(script);
 }
 
@@ -76,7 +75,8 @@ describe("getRevisionContext", () => {
 
     it("warns on malformed JSON and continues to the next script", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      addJson('{"pullRequestsChangesRoute": oops');
+      document.body.innerHTML =
+        '<script type="application/json">{"pullRequestsChangesRoute": oops</script>';
       addJson(prPayload("pullRequestsChangesRoute"));
       expect(getRevisionContext()).toMatchObject({
         baseRef: "b1",
@@ -125,14 +125,6 @@ describe("getRevisionContext", () => {
         headRef: "full-oid",
       });
     });
-
-    it("characterization: reads the legacy shape with object parents", () => {
-      addJson({ commit: { oid: "full-oid", parents: [{ oid: PARENT }] } });
-      expect(getRevisionContext()).toMatchObject({
-        baseRef: PARENT,
-        headRef: "full-oid",
-      });
-    });
   });
 
   describe("pr-commit", () => {
@@ -155,7 +147,9 @@ describe("getRevisionContext", () => {
 
     it("prefers commit JSON over PR JSON", () => {
       addJson(prPayload("pullRequestsChangesRoute"));
-      addJson({ commit: { oid: "c-head", parents: ["c-base"] } });
+      addJson({
+        commitRoute: { commit: { oid: "c-head", parents: ["c-base"] } },
+      });
       expect(getRevisionContext()).toMatchObject({
         baseRef: "c-base",
         headRef: "c-head",
@@ -198,14 +192,18 @@ describe("getRevisionContext", () => {
     it("returns the same object for the same pathname despite DOM changes", () => {
       goTo(`/o/r/commit/${SHA}`);
       const first = getRevisionContext();
-      addJson({ commit: { oid: "later", parents: ["later-base"] } });
+      addJson({
+        commitRoute: { commit: { oid: "later", parents: ["later-base"] } },
+      });
       expect(getRevisionContext()).toBe(first);
     });
 
     it("re-reads after clearRevisionContextCache", () => {
       goTo(`/o/r/commit/${SHA}`);
       const first = getRevisionContext();
-      addJson({ commit: { oid: "later", parents: ["later-base"] } });
+      addJson({
+        commitRoute: { commit: { oid: "later", parents: ["later-base"] } },
+      });
       clearRevisionContextCache();
       expect(getRevisionContext()).toMatchObject({ headRef: "later" });
       expect(getRevisionContext()).not.toBe(first);
