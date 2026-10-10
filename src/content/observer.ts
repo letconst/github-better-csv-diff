@@ -677,11 +677,16 @@ function ensurePlaceholderToggle(
   container: HTMLElement,
   config: UiConfig,
 ): void {
-  if (container.querySelector(".csv-diff-toggle-btn")) return;
+  const existing = container.querySelector<HTMLButtonElement>(
+    ".csv-diff-toggle-btn",
+  );
+  // Runs on every observer pass; replacing an already-disabled toggle would retrigger it forever.
+  if (existing?.disabled) return;
 
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   if (!header) return;
 
+  existing?.remove();
   const btn = createToggleButton();
   btn.classList.remove("csv-diff-toggle-active");
   btn.disabled = true;
