@@ -74,9 +74,9 @@ jobs:
         run: |
           gh pr comment "$PR_NUMBER" --body "<!-- test-result -->
           > [!WARNING]
-          > **$FAILED failed** — $HINT"
+          > **$FAILED failed** — see the [workflow run]($RUN_URL)."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           FAILED: ${{ steps.lint.outcome == 'failure' && 'Lint' || steps.typecheck.outcome == 'failure' && 'Type check' || steps.test.outcome == 'failure' && 'Tests' || steps.build.outcome == 'failure' && 'Chrome build' || steps.build-firefox.outcome == 'failure' && 'Firefox build' || steps.manifest.outcome == 'failure' && 'Manifest check' || 'Setup' }}
-          HINT: ${{ steps.lint.outcome == 'failure' && 'Run `pnpm lint:fix` to auto-fix.' || steps.typecheck.outcome == 'failure' && 'Run `pnpm typecheck` to see the errors.' || steps.test.outcome == 'failure' && 'Run `pnpm test` to see the failures.' || steps.build.outcome == 'failure' && 'Run `pnpm build` to see the errors.' || steps.build-firefox.outcome == 'failure' && 'Run `pnpm build:firefox` to see the errors.' || steps.manifest.outcome == 'failure' && 'Run `pnpm build && pnpm build:firefox && node scripts/check-manifest.mjs`.' || 'Check the workflow log for the setup step that failed.' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
