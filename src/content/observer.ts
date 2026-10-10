@@ -329,9 +329,9 @@ function processExistingDiffs(): void {
       }
 
       // Wrapper gone (collapse/re-expand rebuild, or removed just above).
-      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand.
+      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand, and the raw
+      // attribute so the user's Table View / Raw Diff choice survives it.
       teardownContainerState(container);
-      container.removeAttribute("data-csv-diff-raw");
     }
 
     const isClassic = container.hasAttribute("data-tagsearch-path");
@@ -645,11 +645,16 @@ function findButtonByTooltipText(
   return null;
 }
 
-function createToggleButton(): HTMLButtonElement {
+function setToggleRaw(btn: HTMLButtonElement, raw: boolean): void {
+  btn.textContent = raw ? "Table View" : "Raw Diff";
+  btn.classList.toggle("csv-diff-toggle-active", !raw);
+}
+
+function createToggleButton(raw: boolean): HTMLButtonElement {
   const btn = document.createElement("button");
-  btn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
-  btn.textContent = "Raw Diff";
+  btn.className = "csv-diff-toggle-btn btn btn-sm";
   btn.type = "button";
+  setToggleRaw(btn, raw);
   return btn;
 }
 
@@ -681,7 +686,7 @@ function ensurePlaceholderToggle(
   if (!header) return;
 
   existing?.remove();
-  const btn = createToggleButton();
+  const btn = createToggleButton(container.hasAttribute("data-csv-diff-raw"));
   btn.classList.remove("csv-diff-toggle-active");
   btn.disabled = true;
   btn.setAttribute("aria-disabled", "true");
@@ -704,8 +709,10 @@ function injectTableOverlay(
     return false;
   }
 
+  const raw = container.hasAttribute("data-csv-diff-raw");
   const wrapper = document.createElement("div");
   wrapper.className = "csv-diff-wrapper";
+  wrapper.style.display = raw ? "none" : "";
   wrapper.appendChild(tableElement);
 
   // Snapshot original children before prepending wrapper
@@ -717,14 +724,13 @@ function injectTableOverlay(
     }
   }
 
-  const toggleBtn = createToggleButton();
+  const toggleBtn = createToggleButton(raw);
 
   toggleBtn.addEventListener("click", () => {
     const isTableVisible = wrapper.style.display !== "none";
     wrapper.style.display = isTableVisible ? "none" : "";
     setOriginalChildrenVisible(isTableVisible);
-    toggleBtn.textContent = isTableVisible ? "Table View" : "Raw Diff";
-    toggleBtn.classList.toggle("csv-diff-toggle-active", !isTableVisible);
+    setToggleRaw(toggleBtn, isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
     // Re-sync sticky offset + column widths + row heights when toggling back to
@@ -738,7 +744,7 @@ function injectTableOverlay(
   insertToggleButton(header, config, toggleBtn);
 
   // Place wrapper inside diffBody so collapsing the file hides it too
-  setOriginalChildrenVisible(false);
+  setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
   setupTableObservers(tableElement, container, wrapper, config);
   return true;

@@ -143,6 +143,57 @@ test("Preview collapse removes the body: the surviving toggle becomes a disabled
   await expect(wrapper).toBeHidden();
 });
 
+test("Preview collapse in raw mode keeps the Table View placeholder and re-expands in raw mode", async ({
+  page,
+  site,
+}) => {
+  const region = 'div[role="region"]';
+  const body = `${region} > :nth-child(2)`;
+  await capturePristine(page, body, "outerHTML");
+  await openFixture(
+    page,
+    site,
+    `${prPath}/changes`,
+    fixturePage("preview-pr-split"),
+  );
+  const pristine = await readPristine(page);
+  const wrapper = page.locator(`${region} .csv-diff-wrapper`);
+  const button = page.locator(`${region} .csv-diff-toggle-btn`);
+
+  await button.click();
+  await expect(wrapper).toBeHidden();
+  await expect(button).toHaveText("Table View");
+
+  await page.evaluate((sel) => document.querySelector(sel)!.remove(), body);
+
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveText("Table View");
+  await expect(button).not.toHaveClass(/csv-diff-toggle-active/);
+
+  await page.evaluate(
+    ({ sel, html }) =>
+      document.querySelector(sel)!.insertAdjacentHTML("beforeend", html),
+    { sel: region, html: pristine },
+  );
+
+  await expect(wrapper).toHaveCount(1);
+  await expect(wrapper).toBeHidden();
+  await expect(page.locator(region)).toHaveAttribute("data-csv-diff-raw", "");
+  await expect(button).toHaveCount(1);
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText("Table View");
+  const rawDisplays = await page
+    .locator(`${body} > :not(.csv-diff-wrapper)`)
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).style.display));
+  expect(rawDisplays.length).toBeGreaterThan(0);
+  expect(rawDisplays.every((d) => d !== "none")).toBe(true);
+
+  await button.click();
+  await expect(wrapper).toBeVisible();
+  await expect(button).toHaveText("Raw Diff");
+});
+
 test("snapshot restore replaces the stale wrapper and re-attaches a working toggle", async ({
   page,
   site,
