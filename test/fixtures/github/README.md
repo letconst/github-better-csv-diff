@@ -8,7 +8,7 @@ its markup, refresh these and review the test expectations separately.
 |---|---|---|---|
 | `preview-commit-split.html` | `/letconst/github-better-csv-diff/commit/2076518958…?diff=split`, `div[role="region"]` for `example/wide.csv` | Preview UI, split | 2026-10-10 |
 | `preview-commit-unified.html` | same commit, `?diff=unified` | Preview UI, unified | 2026-10-10 |
-| `preview-pr-split.html` | `/letconst/github-better-csv-diff/pull/2/changes?diff=split&new_files_changed=true`, `div[id^="diff-"][role="region"]` for `example/sample.csv` (logged in via `playwright-cli attach --extension=chrome`) | Preview UI, split | 2026-10-11 |
+| `preview-pr-split.html` | `/letconst/github-better-csv-diff/pull/2/changes?diff=split&new_files_changed=true`, `div[id^="diff-"][role="region"]` for `example/sample.csv` (logged in) | Preview UI, split | 2026-10-11 |
 | `preview-pr-unified.html` | same PR, `?diff=unified&new_files_changed=true` | Preview UI, unified | 2026-10-11 |
 | `classic-pr-split.html` | `/letconst/github-better-csv-diff/pull/2/files?diff=split`, `div.file.js-file[data-tagsearch-path="example/sample.csv"]` | Classic UI, split | 2026-10-10 |
 | `classic-pr-unified.html` | same PR, `?diff=unified` | Classic UI, unified | 2026-10-10 |
@@ -19,12 +19,16 @@ The commit page shows commit `20765189` (parent `20765189^`).
 
 ## Refresh
 
+Open the URL in the dedicated-profile Chrome (`pnpm browser:chrome`, see
+AGENTS.md) and run this through the `chrome-devtools` MCP server's
+`evaluate_script`, with `filePath` pointing at the fixture:
+
 ```
-playwright-cli open <url>
-playwright-cli eval --raw --filename=test/fixtures/github/<name>.html "() => document.querySelector('<selector>').outerHTML"
+() => document.querySelector('<selector>').outerHTML
 ```
 
-The saved result is a JSON string; decode it to raw HTML before committing.
+The file is written with a `.json` extension and holds a JSON string; decode
+it to raw HTML and rename it to `<name>.html` before committing.
 Logged-out PR pages render the Classic UI. The Preview UI PR page needs a
 logged-in session and the `new_files_changed=true` query.
 
