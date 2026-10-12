@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--browserUrl=http://127.0.0.1:9222"],
+      "env": {}
+    },
+    "firefox-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mozilla/firefox-devtools-mcp@latest",
+        "--tool-preset",
+        "developer",
+        "--profile-path",
+        "${LOCALAPPDATA}\\github-better-csv-diff\\firefox-profile"
+      ],
+      "env": {}
+    }
+  }
+}

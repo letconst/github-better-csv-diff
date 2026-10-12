@@ -57,7 +57,10 @@ For Firefox, load `dist/firefox-mv2/` via `about:debugging`.
 
 ## Manual Browser Verification
 
-To verify extension behavior in the browser, use `playwright-cli attach --extension` to connect to the user's running browser with the extension installed.
+Manual DOM checks go through the MCP servers declared in `.mcp.json` (Windows paths). Playwright is for E2E tests only. Both browsers use a dedicated profile under `%LOCALAPPDATA%\github-better-csv-diff\`; sign in to GitHub there once by hand so the session persists.
+
+- **Chrome** (`chrome-devtools`): attaches to a Chrome already running with remote debugging. Start it with `pnpm browser:chrome`. One-time setup in that profile: load `dist/chrome-mv3` as an unpacked extension at `chrome://extensions`. After `pnpm build`, reload the extension there.
+- **Firefox** (`firefox-devtools`): the MCP server launches Firefox itself. `pnpm browser:firefox` opens the same profile by hand (for signing in); close it before using the MCP server, since one profile cannot be open twice. Extension installs are temporary, so after `pnpm build:firefox` call `install_extension` with `type: "path"` and the absolute path to `dist/firefox-mv2` at the start of each session.
 
 ## Testing
 
