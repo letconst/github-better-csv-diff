@@ -8,11 +8,8 @@
 
 .vscode/*
 .idea/*
-.playwright-cli/*
 
 .DS_Store
 *.local.*
-# Playwright CLI output (may contain credentials)
-.playwright-cli/
 
 test-results/
