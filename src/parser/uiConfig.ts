@@ -58,6 +58,14 @@ export const PREVIEW_UI: UiConfig = {
   },
 };
 
+// GitHub's expanded-context rows put .blob-code-inner on the <td> itself;
+// ordinary diff rows wrap the text in a child span.
+const classicCodeText = (cell: HTMLTableCellElement): string =>
+  (cell.matches(".blob-code-inner")
+    ? cell
+    : cell.querySelector<HTMLElement>(".blob-code-inner")
+  )?.textContent ?? "";
+
 export const CLASSIC_UI: UiConfig = {
   tableSelector: "table.diff-table",
   rowSelector: "tbody tr",
@@ -77,10 +85,8 @@ export const CLASSIC_UI: UiConfig = {
         ? "down"
         : "all";
   },
-  extractContent: (cell) =>
-    cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
-  extractChangedContent: (cell) =>
-    cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
+  extractContent: classicCodeText,
+  extractChangedContent: classicCodeText,
   extractLineNumber: (cell) => {
     const attr = cell.getAttribute("data-line-number");
     if (attr == null) return null;

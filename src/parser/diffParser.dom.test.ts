@@ -262,6 +262,59 @@ describe.each<[string, UiFixture, string, string, string, string]>([
   },
 );
 
+describe("extractDiffLinesFromDom: Classic UI after expanding all context (large-file.csv, PR #2)", () => {
+  const lines = () =>
+    extracted("classic-pr-split-large-file-expanded", CLASSIC);
+
+  it("extracts the expanded header row as unchanged line 1", () => {
+    expect(lines()[0]).toEqual({
+      type: "unchanged",
+      content:
+        "record_id,city,country,population,area_km2,timezone,founded_year",
+      oldLineNumber: 1,
+      newLineNumber: 1,
+    });
+  });
+
+  it("extracts the second expanded row as unchanged line 2", () => {
+    expect(lines()[1]).toEqual({
+      type: "unchanged",
+      content: "R001,Tokyo,Japan,13960000,2194,Asia/Tokyo,1457",
+      oldLineNumber: 2,
+      newLineNumber: 2,
+    });
+  });
+
+  it("extracts the last expanded row as unchanged line 46", () => {
+    expect(lines().at(-1)).toEqual({
+      type: "unchanged",
+      content: "R045,Vancouver,Canada,662000,115,America/Vancouver,1886",
+      oldLineNumber: 46,
+      newLineNumber: 46,
+    });
+  });
+
+  it("leaves no line entry with empty content", () => {
+    const empty = lines().filter((l) => l.type !== "hunk" && l.content === "");
+    expect(empty).toEqual([]);
+  });
+
+  it("still extracts the changed France rows", () => {
+    expect(lines()).toContainEqual({
+      type: "removed",
+      content: "R026,Paris,France,2161000,105,Europe/Paris,259",
+      oldLineNumber: 27,
+      newLineNumber: null,
+    });
+    expect(lines()).toContainEqual({
+      type: "added",
+      content: "R026,Paris,France,2162000,105,Europe/Paris,259",
+      oldLineNumber: null,
+      newLineNumber: 27,
+    });
+  });
+});
+
 describe.each<[string, UiFixture, string]>([
   ["Preview UI", PREVIEW, "preview-pr-split"],
   ["Classic UI", CLASSIC, "classic-pr-split"],
