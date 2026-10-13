@@ -304,6 +304,11 @@ function handleViewportScroll(): void {
 }
 
 function processExistingDiffs(): void {
+  // Preview UI replaces the whole region on context expansion, detaching the old container without any event.
+  for (const container of [...containerStates.keys()]) {
+    if (!container.isConnected) teardownContainerState(container);
+  }
+
   // Preview UI containers (PR + commit pages).
   // Use a broad selector so collapsed files (no table in DOM) are still found.
   // Non-diff regions are filtered out by the filename/CSV check below.
