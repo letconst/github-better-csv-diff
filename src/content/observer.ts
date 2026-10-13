@@ -38,6 +38,10 @@ let lifecycleInitialized = false;
 // clicked, dropping the container attribute, so the Raw Diff choice is kept here.
 const rawChoices = new Map<string, boolean>();
 
+// A re-added node carrying one of these ids is a GitHub re-render of a file we
+// already replaced; it must be processed before paint, not after the debounce.
+const processedContainerIds = new Set<string>();
+
 function rawChoiceKey(filename: string): string {
   return `${location.pathname}\n${filename}`;
 }
@@ -98,12 +102,34 @@ function syncObserverWithRoute(): void {
 function connectObserver(): void {
   if (observer || !document.body) return;
   debouncedCallback = debounce(processExistingDiffs, 300);
-  observer = new MutationObserver(debouncedCallback);
+  const debounced = debouncedCallback;
+  observer = new MutationObserver((mutations, obs) => {
+    if (!addsProcessedContainer(mutations)) {
+      debounced(mutations, obs);
+      return;
+    }
+    debounced.cancel();
+    processExistingDiffs();
+  });
   observer.observe(document.body, { childList: true, subtree: true });
   console.debug(
     "[GitHub Better CSV Diff] Observer connected",
     location.pathname,
   );
+}
+
+function addsProcessedContainer(mutations: MutationRecord[]): boolean {
+  if (processedContainerIds.size === 0) return false;
+  for (const mutation of mutations) {
+    for (const node of mutation.addedNodes) {
+      if (!(node instanceof Element)) continue;
+      if (processedContainerIds.has(node.id)) return true;
+      for (const id of processedContainerIds) {
+        if (node.querySelector(`#${CSS.escape(id)}`)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function disconnectObserver(): void {
@@ -114,6 +140,7 @@ function disconnectObserver(): void {
   clearRevisionContextCache();
   clearHeaderCache();
   rawChoices.clear();
+  processedContainerIds.clear();
   // Disconnect per-table ResizeObservers and cancel pending rAFs so they don't
   // leak across navigations / Turbo snapshot caching.
   teardownAllContainerStates();
@@ -833,6 +860,7 @@ function injectTableOverlay(
   setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
   setupTableObservers(tableElement, container, wrapper, config, nativeRowCount);
+  if (container.id) processedContainerIds.add(container.id);
   return true;
 }
 

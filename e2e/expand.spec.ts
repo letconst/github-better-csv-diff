@@ -248,6 +248,31 @@ test("a region re-rendered by GitHub stays in Table View when the user did not s
   await expect(page.locator(region)).not.toHaveAttribute("data-csv-diff-raw");
 });
 
+test("a region re-rendered by GitHub shows the CSV table before the debounce fires", async ({
+  page,
+  site,
+}) => {
+  await openPreview(page, site);
+
+  const { hasWrapper, nativeHidden } = await page.evaluate(async (sel) => {
+    const old = document.querySelector(sel)!;
+    const html = (window as unknown as { __region: string }).__region;
+    const next = new DOMParser().parseFromString(html, "text/html").body
+      .firstElementChild!;
+    old.replaceWith(next);
+    await new Promise((r) => setTimeout(r, 0));
+    return {
+      hasWrapper: document.querySelector(`${sel} .csv-diff-wrapper`) !== null,
+      nativeHidden:
+        document.querySelector<HTMLElement>('table[role="grid"]')?.style
+          .display === "none",
+    };
+  }, region);
+
+  expect(hasWrapper).toBe(true);
+  expect(nativeHidden).toBe(true);
+});
+
 test("the Raw Diff choice does not leak to the same file on another diff route", async ({
   page,
   site,
