@@ -126,6 +126,8 @@ interface PerContainerState {
   syncing: boolean;
   /** Last value written to --csv-diff-sticky-top; lets us skip no-op rewrites. */
   lastStickyTop: string | null;
+  /** Native diff rows at extraction time; a different count means GitHub expanded the diff. */
+  nativeRowCount: number;
 }
 
 const containerStates = new Map<HTMLElement, PerContainerState>();
@@ -205,6 +207,7 @@ function setupTableObservers(
   container: HTMLElement,
   wrapper: HTMLElement,
   config: UiConfig,
+  nativeRowCount: number,
 ): void {
   teardownContainerState(container);
 
@@ -217,6 +220,7 @@ function setupTableObservers(
     rafId: null,
     syncing: false,
     lastStickyTop: null,
+    nativeRowCount,
   };
   containerStates.set(container, state);
 
@@ -305,15 +309,22 @@ function processExistingDiffs(): void {
     if (container.hasAttribute(PROCESSED_ATTR)) {
       const wrapper = container.querySelector<HTMLElement>(".csv-diff-wrapper");
       if (wrapper) {
-        // Wrapper present AND observer state live — fully processed, skip.
-        if (containerStates.has(container)) continue;
+        const state = containerStates.get(container);
+        // Wrapper present AND observer state live AND native table unchanged —
+        // fully processed, skip.
+        if (
+          state &&
+          countNativeRows(container, state.config) === state.nativeRowCount
+        ) {
+          continue;
+        }
 
-        // Wrapper present but state gone: a Turbo snapshot / bfcache restore
+        // Otherwise the wrapper is stale: a Turbo snapshot / bfcache restore
         // brought back the markup with all JS-attached listeners + observers
-        // stripped (disconnectObserver ran on before-cache). Drop the stale
-        // wrapper and fall through to a full re-init, which re-renders +
-        // re-injects and thereby re-attaches scroll/toggle listeners and
-        // re-registers observers.
+        // stripped (disconnectObserver ran on before-cache), or Classic UI
+        // inserted expanded rows into the native table. Drop the wrapper and
+        // fall through to a full re-init, which re-renders + re-injects and
+        // thereby re-attaches scroll/toggle listeners and re-registers observers.
         //
         // First un-hide the original diff children: injectTableOverlay hid them
         // with inline display:none, which the snapshot preserved. Restoring them
@@ -378,6 +389,14 @@ function getFilenameFromH3(container: HTMLElement): string | null {
   );
 }
 
+function countNativeRows(container: HTMLElement, config: UiConfig): number {
+  return (
+    container
+      .querySelector(config.tableSelector)
+      ?.querySelectorAll(config.rowSelector).length ?? 0
+  );
+}
+
 function processCsvDiffBlock(
   container: HTMLElement,
   config: UiConfig,
@@ -385,6 +404,7 @@ function processCsvDiffBlock(
 ): void {
   try {
     const diffLines = extractDiffLinesFromDom(container, config);
+    const nativeRowCount = countNativeRows(container, config);
     if (diffLines.length === 0) {
       console.warn(
         "[GitHub Better CSV Diff] No diff lines extracted from",
@@ -402,7 +422,7 @@ function processCsvDiffBlock(
     if (!needsBeforeHeader && !needsAfterHeader) {
       // No header fetch needed — render as before
       const tableElement = renderDiffTable(csvDiff);
-      if (injectTableOverlay(container, tableElement, config)) {
+      if (injectTableOverlay(container, tableElement, config, nativeRowCount)) {
         container.setAttribute(PROCESSED_ATTR, "true");
       }
       return;
@@ -420,7 +440,8 @@ function processCsvDiffBlock(
       willFetchAfter,
     );
     const tableElement = renderDiffTable(csvDiff, options);
-    if (!injectTableOverlay(container, tableElement, config)) return;
+    if (!injectTableOverlay(container, tableElement, config, nativeRowCount))
+      return;
     container.setAttribute(PROCESSED_ATTR, "true");
 
     if (!willFetchBefore && !willFetchAfter) {
@@ -445,6 +466,7 @@ function processCsvDiffBlock(
       willFetchAfter,
       needsBeforeHeader,
       needsAfterHeader,
+      nativeRowCount,
     });
   } catch (error) {
     console.error(
@@ -513,6 +535,7 @@ interface FetchAndRerenderParams {
   willFetchAfter: boolean;
   needsBeforeHeader: boolean;
   needsAfterHeader: boolean;
+  nativeRowCount: number;
 }
 
 async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
@@ -530,6 +553,7 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     willFetchAfter,
     needsBeforeHeader,
     needsAfterHeader,
+    nativeRowCount,
   } = params;
 
   try {
@@ -559,7 +583,7 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
       oldContainer.replaceWith(newTable);
       // Re-init sticky offset + column/row sync and re-register observers on the
       // replacement table (the old container's observers are now stale).
-      setupTableObservers(newTable, container, wrapper, config);
+      setupTableObservers(newTable, container, wrapper, config, nativeRowCount);
     }
   } catch (error) {
     console.warn(
@@ -698,6 +722,7 @@ function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement,
   config: UiConfig,
+  nativeRowCount: number,
 ): boolean {
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   const diffBody = container.querySelector<HTMLElement>(config.contentSelector);
@@ -746,7 +771,7 @@ function injectTableOverlay(
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
-  setupTableObservers(tableElement, container, wrapper, config);
+  setupTableObservers(tableElement, container, wrapper, config, nativeRowCount);
   return true;
 }
 
