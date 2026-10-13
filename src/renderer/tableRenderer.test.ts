@@ -782,6 +782,20 @@ describe("renderDiffTable: expand gap rows", () => {
     }
   });
 
+  it("renders a clicked gap's buttons disabled on both sides of a rebuilt table", () => {
+    const diff = gapDiff(twoExpanders());
+    const first = renderDiffTable(diff);
+    document.body.appendChild(first);
+    gapButtons(first, 0)[0]!.click();
+
+    const second = renderDiffTable(diff);
+    for (const i of [0, 1] as const) {
+      const buttons = gapButtons(second, i);
+      expect(buttons).toHaveLength(2);
+      expect(buttons.map((b) => b.disabled)).toEqual([true, true]);
+    }
+  });
+
   it("warns and re-enables the buttons when the native control is detached", () => {
     const expanders = twoExpanders();
     expanders[0]!.element.remove();

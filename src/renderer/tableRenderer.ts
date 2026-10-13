@@ -13,6 +13,10 @@ import { type MatchedRow, matchRows } from "./rowMatcher";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+// GitHub discards the clicked native control once the expansion lands, so a
+// table rebuilt from fresh DOM never inherits a stale mark.
+const clickedExpanders = new WeakSet<HTMLElement>();
+
 const EXPAND_ICON_PATHS: Record<Expander["direction"], string> = {
   up: "M7.823 1.677 4.927 4.573A.25.25 0 0 0 5.104 5H7.25v3.236a.75.75 0 1 0 1.5 0V5h2.146a.25.25 0 0 0 .177-.427L8.177 1.677a.25.25 0 0 0-.354 0ZM13.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Zm-3.75.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75ZM7.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM4 11.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75ZM1.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z",
   down: "m8.177 14.323 2.896-2.896a.25.25 0 0 0-.177-.427H8.75V7.764a.75.75 0 1 0-1.5 0V11H5.104a.25.25 0 0 0-.177.427l2.896 2.896a.25.25 0 0 0 .354 0ZM2.25 5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 4.25a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75ZM8.25 5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 4.25a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z",
@@ -247,6 +251,7 @@ export function renderDiffTable(
     diff.alignment,
   );
 
+  const gapButtons = new Map<number, HTMLButtonElement[]>();
   container.appendChild(
     buildSide(
       "Before",
@@ -254,6 +259,7 @@ export function renderDiffTable(
       matched,
       "before",
       maxCols,
+      gapButtons,
       before.isLoading,
     ),
   );
@@ -264,12 +270,12 @@ export function renderDiffTable(
       matched,
       "after",
       maxCols,
+      gapButtons,
       after.isLoading,
     ),
   );
 
   highlightChangedCells(container, matched);
-  bindExpandButtons(container, matched);
 
   // Synchronize horizontal scroll between Before and After sides. The body is
   // the only horizontal scroll container; mirror its scrollLeft to the other
@@ -303,47 +309,35 @@ export function renderDiffTable(
   return container;
 }
 
-function bindExpandButtons(
-  container: HTMLElement,
-  matched: MatchedRow[],
-): void {
-  matched.forEach((match, index) => {
-    if (match.type !== "gap") return;
-    const buttons = container.querySelectorAll<HTMLButtonElement>(
-      `tr.csv-diff-row-gap[data-gap-index="${index}"] .csv-diff-expand-btn`,
-    );
-    const setDisabled = (disabled: boolean) => {
-      for (const b of buttons) b.disabled = disabled;
-    };
-    for (const button of buttons) {
-      const expander = match.expanders[Number(button.dataset.expanderIndex)]!;
-      button.addEventListener("click", () => {
-        setDisabled(true);
-        if (expander.element.isConnected) {
-          expander.element.click();
-          return;
-        }
-        console.warn(
-          "[GitHub Better CSV Diff] Native expand control is gone",
-          expander.label,
-        );
-        setDisabled(false);
-      });
-    }
-  });
-}
-
 function buildExpandButton(
   expander: Expander,
-  expanderIndex: number,
+  gap: Expander[],
+  group: HTMLButtonElement[],
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "csv-diff-expand-btn";
   button.dataset.direction = expander.direction;
-  button.dataset.expanderIndex = String(expanderIndex);
   button.setAttribute("aria-label", expander.label);
   button.title = expander.label;
+  button.disabled = clickedExpanders.has(expander.element);
+  group.push(button);
+  button.addEventListener("click", () => {
+    const setDisabled = (disabled: boolean) => {
+      for (const b of group) b.disabled = disabled;
+    };
+    setDisabled(true);
+    if (expander.element.isConnected) {
+      for (const e of gap) clickedExpanders.add(e.element);
+      expander.element.click();
+      return;
+    }
+    console.warn(
+      "[GitHub Better CSV Diff] Native expand control is gone",
+      expander.label,
+    );
+    setDisabled(false);
+  });
 
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "csv-diff-expand-icon");
@@ -365,6 +359,7 @@ function buildSide(
   matched: MatchedRow[],
   side: "before" | "after",
   maxCols: number,
+  gapButtons: Map<number, HTMLButtonElement[]>,
   isLoading = false,
 ): HTMLElement {
   const sideDiv = document.createElement("div");
@@ -379,7 +374,7 @@ function buildSide(
   // body's horizontal scroll container and stick to the viewport. Their column
   // widths are aligned at runtime by syncColumnWidths.
   sideDiv.appendChild(buildHeaderTable(headers, maxCols, isLoading));
-  sideDiv.appendChild(buildBodyTable(matched, side, maxCols));
+  sideDiv.appendChild(buildBodyTable(matched, side, maxCols, gapButtons));
   return sideDiv;
 }
 
@@ -440,6 +435,7 @@ function buildBodyTable(
   matched: MatchedRow[],
   side: "before" | "after",
   maxCols: number,
+  gapButtons: Map<number, HTMLButtonElement[]>,
 ): HTMLElement {
   const bodyDiv = document.createElement("div");
   bodyDiv.className = "csv-diff-body";
@@ -455,12 +451,16 @@ function buildBodyTable(
     if (match.type === "gap") {
       const gapTr = document.createElement("tr");
       gapTr.className = "csv-diff-row-gap";
-      gapTr.dataset.gapIndex = String(index);
       const gapTd = document.createElement("td");
       gapTd.colSpan = colCount;
-      match.expanders.forEach((expander, i) => {
-        gapTd.appendChild(buildExpandButton(expander, i));
-      });
+      let group = gapButtons.get(index);
+      if (!group) {
+        group = [];
+        gapButtons.set(index, group);
+      }
+      for (const expander of match.expanders) {
+        gapTd.appendChild(buildExpandButton(expander, match.expanders, group));
+      }
       gapTr.appendChild(gapTd);
       tbody.appendChild(gapTr);
       return;
@@ -516,7 +516,6 @@ function highlightChangedCells(
 
   for (let i = 0; i < matched.length; i++) {
     const match = matched[i]!;
-    if (match.type === "gap") continue;
     if (match.type !== "modified" || !match.before || !match.after) continue;
 
     const beforeTr = beforeRows[i];
