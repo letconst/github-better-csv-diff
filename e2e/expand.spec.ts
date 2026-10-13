@@ -57,8 +57,13 @@ async function stubNativeExpandUp(page: Page) {
   });
 }
 
-async function openLargeFile(page: Page, site: Site, gate?: Promise<void>) {
-  site.raw.set(rawPath, { status: 206, body: headerLine, release: gate });
+async function openLargeFile(
+  page: Page,
+  site: Site,
+  gate?: Promise<void>,
+  status = 206,
+) {
+  site.raw.set(rawPath, { status, body: headerLine, release: gate });
   await openFixture(page, site, filesPath, largeFilePage);
 }
 
@@ -126,6 +131,65 @@ test("rows inserted while the header fetch is pending still rebuild the table", 
   await expect(page.locator(beforeRows)).toHaveCount(before + 3);
   await expect(page.locator(".csv-diff-loading")).toHaveCount(0);
   await expect(page.locator(".csv-diff-wrapper")).toHaveCount(1);
+});
+
+test("a gap clicked while the header fetch is pending stays disabled after the table is replaced", async ({
+  page,
+  site,
+}) => {
+  const gate = hold();
+  await openLargeFile(page, site, gate.promise);
+  await expect(page.locator(".csv-diff-loading")).toHaveCount(2);
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLElement>('a.js-expand[aria-label="Expand Up"]')!
+      .addEventListener("click", (event) => event.preventDefault());
+  });
+  const gapButtons = page.locator(
+    "tr.csv-diff-row-gap:first-child button.csv-diff-expand-btn",
+  );
+
+  await gapButtons.first().dispatchEvent("click");
+  await expect(gapButtons.first()).toBeDisabled();
+  await expect(gapButtons.last()).toBeDisabled();
+  gate.release();
+
+  await expect(page.locator(".csv-diff-loading")).toHaveCount(0);
+  await expect(gapButtons).toHaveCount(2);
+  await expect(gapButtons.first()).toBeDisabled();
+  await expect(gapButtons.last()).toBeDisabled();
+});
+
+test("a gap clicked while the header fetch is pending stays on the same gap when the fetch fails", async ({
+  page,
+  site,
+}) => {
+  const gate = hold();
+  await openLargeFile(page, site, gate.promise, 500);
+  await expect(page.locator(".csv-diff-loading")).toHaveCount(2);
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLElement>('a.js-expand[aria-label="Expand Down"]')!
+      .addEventListener("click", (event) => event.preventDefault());
+  });
+  const lastGapButtons = page.locator(
+    "tr.csv-diff-row-gap:last-child button.csv-diff-expand-btn",
+  );
+  const firstGapButtons = page.locator(
+    "tr.csv-diff-row-gap:first-child button.csv-diff-expand-btn",
+  );
+  await expect(lastGapButtons).toHaveCount(2);
+
+  await lastGapButtons.last().dispatchEvent("click");
+  await expect(lastGapButtons.first()).toBeDisabled();
+  await expect(lastGapButtons.last()).toBeDisabled();
+  gate.release();
+
+  await expect(page.locator(".csv-diff-loading")).toHaveCount(0);
+  await expect(lastGapButtons.first()).toBeDisabled();
+  await expect(lastGapButtons.last()).toBeDisabled();
+  await expect(firstGapButtons.first()).toBeEnabled();
+  await expect(firstGapButtons.last()).toBeEnabled();
 });
 
 const region = 'div[role="region"]';

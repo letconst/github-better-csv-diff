@@ -605,6 +605,31 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
 
     const oldContainer = wrapper.querySelector(".csv-diff-container");
     if (oldContainer) {
+      // A click made while the fetch was pending already triggered GitHub's native
+      // expander; the replacement must not offer it again before the rows land.
+      // Gaps are matched by ordinal among gap rows: a failed header fetch falls back
+      // to the default header mode, which shifts every `data-gap-index`.
+      const clickedOrdinals = new Set<number>();
+      oldContainer
+        .querySelector(".csv-diff-body-table")
+        ?.querySelectorAll("tr.csv-diff-row-gap")
+        .forEach((row, ordinal) => {
+          if (row.querySelector(".csv-diff-expand-btn:disabled")) {
+            clickedOrdinals.add(ordinal);
+          }
+        });
+      for (const table of newTable.querySelectorAll(".csv-diff-body-table")) {
+        table
+          .querySelectorAll("tr.csv-diff-row-gap")
+          .forEach((row, ordinal) => {
+            if (!clickedOrdinals.has(ordinal)) return;
+            for (const btn of row.querySelectorAll<HTMLButtonElement>(
+              ".csv-diff-expand-btn",
+            )) {
+              btn.disabled = true;
+            }
+          });
+      }
       oldContainer.replaceWith(newTable);
       // Re-init sticky offset + column/row sync and re-register observers on the
       // replacement table (the old container's observers are now stale).
