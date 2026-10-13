@@ -101,8 +101,8 @@ function syncObserverWithRoute(): void {
 
 function connectObserver(): void {
   if (observer || !document.body) return;
-  debouncedCallback = debounce(processExistingDiffs, 300);
-  const debounced = debouncedCallback;
+  const debounced = debounce(processExistingDiffs, 300);
+  debouncedCallback = debounced;
   observer = new MutationObserver((mutations, obs) => {
     if (!addsProcessedContainer(mutations)) {
       debounced(mutations, obs);
@@ -124,8 +124,10 @@ function addsProcessedContainer(mutations: MutationRecord[]): boolean {
     for (const node of mutation.addedNodes) {
       if (!(node instanceof Element)) continue;
       if (processedContainerIds.has(node.id)) return true;
-      for (const id of processedContainerIds) {
-        if (node.querySelector(`#${CSS.escape(id)}`)) return true;
+      for (const el of node.querySelectorAll<HTMLElement>(
+        'div[role="region"][id], div.file.js-file[id]',
+      )) {
+        if (processedContainerIds.has(el.id)) return true;
       }
     }
   }
@@ -162,8 +164,6 @@ interface PerContainerState {
   syncing: boolean;
   /** Last value written to --csv-diff-sticky-top; lets us skip no-op rewrites. */
   lastStickyTop: string | null;
-  /** Native diff rows at extraction time; a different count means GitHub expanded the diff. */
-  nativeRowCount: number;
 }
 
 const containerStates = new Map<HTMLElement, PerContainerState>();
@@ -243,7 +243,6 @@ function setupTableObservers(
   container: HTMLElement,
   wrapper: HTMLElement,
   config: UiConfig,
-  nativeRowCount: number,
 ): void {
   teardownContainerState(container);
 
@@ -256,7 +255,6 @@ function setupTableObservers(
     rafId: null,
     syncing: false,
     lastStickyTop: null,
-    nativeRowCount,
   };
   containerStates.set(container, state);
 
@@ -351,11 +349,12 @@ function processExistingDiffs(): void {
       const wrapper = container.querySelector<HTMLElement>(".csv-diff-wrapper");
       if (wrapper) {
         const state = containerStates.get(container);
-        // Wrapper present AND observer state live AND native table unchanged —
-        // fully processed, skip.
+        // Wrapper present AND observer state live AND native table unchanged
+        // (PROCESSED_ATTR holds the row count at extraction) — fully processed, skip.
         if (
           state &&
-          countNativeRows(container, state.config) === state.nativeRowCount
+          container.getAttribute(PROCESSED_ATTR) ===
+            String(countNativeRows(container, state.config))
         ) {
           continue;
         }
@@ -432,9 +431,8 @@ function getFilenameFromH3(container: HTMLElement): string | null {
 
 function countNativeRows(container: HTMLElement, config: UiConfig): number {
   return (
-    container
-      .querySelector(config.tableSelector)
-      ?.querySelectorAll(config.rowSelector).length ?? 0
+    container.querySelector<HTMLTableElement>(config.tableSelector)?.rows
+      .length ?? 0
   );
 }
 
@@ -463,16 +461,8 @@ function processCsvDiffBlock(
     if (!needsBeforeHeader && !needsAfterHeader) {
       // No header fetch needed — render as before
       const tableElement = renderDiffTable(csvDiff);
-      if (
-        injectTableOverlay(
-          container,
-          tableElement,
-          config,
-          nativeRowCount,
-          filename,
-        )
-      ) {
-        container.setAttribute(PROCESSED_ATTR, "true");
+      if (injectTableOverlay(container, tableElement, config, filename)) {
+        container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
       }
       return;
     }
@@ -489,17 +479,8 @@ function processCsvDiffBlock(
       willFetchAfter,
     );
     const tableElement = renderDiffTable(csvDiff, options);
-    if (
-      !injectTableOverlay(
-        container,
-        tableElement,
-        config,
-        nativeRowCount,
-        filename,
-      )
-    )
-      return;
-    container.setAttribute(PROCESSED_ATTR, "true");
+    if (!injectTableOverlay(container, tableElement, config, filename)) return;
+    container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
 
     if (!willFetchBefore && !willFetchAfter) {
       return;
@@ -523,7 +504,6 @@ function processCsvDiffBlock(
       willFetchAfter,
       needsBeforeHeader,
       needsAfterHeader,
-      nativeRowCount,
     });
   } catch (error) {
     console.error(
@@ -592,7 +572,6 @@ interface FetchAndRerenderParams {
   willFetchAfter: boolean;
   needsBeforeHeader: boolean;
   needsAfterHeader: boolean;
-  nativeRowCount: number;
 }
 
 async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
@@ -610,7 +589,6 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     willFetchAfter,
     needsBeforeHeader,
     needsAfterHeader,
-    nativeRowCount,
   } = params;
 
   try {
@@ -637,35 +615,10 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
 
     const oldContainer = wrapper.querySelector(".csv-diff-container");
     if (oldContainer) {
-      // A click made while the fetch was pending already triggered GitHub's native
-      // expander; the replacement must not offer it again before the rows land.
-      // Gaps are matched by ordinal among gap rows: a failed header fetch falls back
-      // to the default header mode, which shifts every `data-gap-index`.
-      const clickedOrdinals = new Set<number>();
-      oldContainer
-        .querySelector(".csv-diff-body-table")
-        ?.querySelectorAll("tr.csv-diff-row-gap")
-        .forEach((row, ordinal) => {
-          if (row.querySelector(".csv-diff-expand-btn:disabled")) {
-            clickedOrdinals.add(ordinal);
-          }
-        });
-      for (const table of newTable.querySelectorAll(".csv-diff-body-table")) {
-        table
-          .querySelectorAll("tr.csv-diff-row-gap")
-          .forEach((row, ordinal) => {
-            if (!clickedOrdinals.has(ordinal)) return;
-            for (const btn of row.querySelectorAll<HTMLButtonElement>(
-              ".csv-diff-expand-btn",
-            )) {
-              btn.disabled = true;
-            }
-          });
-      }
       oldContainer.replaceWith(newTable);
       // Re-init sticky offset + column/row sync and re-register observers on the
       // replacement table (the old container's observers are now stale).
-      setupTableObservers(newTable, container, wrapper, config, nativeRowCount);
+      setupTableObservers(newTable, container, wrapper, config);
     }
   } catch (error) {
     console.warn(
@@ -804,7 +757,6 @@ function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement,
   config: UiConfig,
-  nativeRowCount: number,
   filename: string,
 ): boolean {
   const header = container.querySelector<HTMLElement>(config.headerSelector);
@@ -859,7 +811,7 @@ function injectTableOverlay(
   // Place wrapper inside diffBody so collapsing the file hides it too
   setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
-  setupTableObservers(tableElement, container, wrapper, config, nativeRowCount);
+  setupTableObservers(tableElement, container, wrapper, config);
   if (container.id) processedContainerIds.add(container.id);
   return true;
 }
