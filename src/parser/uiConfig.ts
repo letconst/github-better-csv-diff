@@ -78,12 +78,11 @@ export const CLASSIC_UI: UiConfig = {
   stickyFileHeaderSelector: ".file-header",
   expanderSelector: "a.js-expand",
   expanderDirection: (el) => {
-    const label = el.getAttribute("aria-label");
-    return label === "Expand Up"
-      ? "up"
-      : label === "Expand Down"
-        ? "down"
-        : "all";
+    const byLabel: Record<string, "up" | "down"> = {
+      "Expand Up": "up",
+      "Expand Down": "down",
+    };
+    return byLabel[el.getAttribute("aria-label") ?? ""] ?? "all";
   },
   extractContent: classicCodeText,
   extractChangedContent: classicCodeText,

@@ -101,7 +101,7 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     alignment: lines.map(
       (line): DiffAlignment =>
         line.type === "hunk"
-          ? { type: "hunk", expanders: line.expanders }
+          ? line
           : {
               type: line.type,
               oldLineNumber: line.oldLineNumber,
@@ -119,13 +119,9 @@ function isCellEmpty(cell: HTMLTableCellElement, ui: UiConfig): boolean {
   );
 }
 
-function isHunkRow(
-  row: HTMLElement,
-  cells: NodeListOf<HTMLTableCellElement>,
-  ui: UiConfig,
-): boolean {
+function isHunkRow(row: HTMLTableRowElement, ui: UiConfig): boolean {
   return (
-    cells[0]!.classList.contains(ui.hunkClass) ||
+    row.cells[0]!.classList.contains(ui.hunkClass) ||
     row.querySelector(ui.expanderSelector) !== null
   );
 }
@@ -153,7 +149,7 @@ export function extractDiffLinesFromDom(
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
-    if (isHunkRow(row, cells, ui)) continue;
+    if (isHunkRow(row, ui)) continue;
     if (cells.length === 3) {
       isUnifiedLayout = true;
       break;
@@ -171,7 +167,7 @@ export function extractDiffLinesFromDom(
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
 
-    if (isHunkRow(row, cells, ui)) {
+    if (isHunkRow(row, ui)) {
       const expanders = Array.from(
         row.querySelectorAll<HTMLElement>(ui.expanderSelector),
         (element): Expander => ({

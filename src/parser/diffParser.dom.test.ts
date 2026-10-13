@@ -86,14 +86,15 @@ function diffLineFactory(beforeFile: string, afterFile: string) {
 }
 
 type LineEntry = Exclude<DiffLine, { type: "hunk" }>;
+const isLineEntry = (l: DiffLine): l is LineEntry => l.type !== "hunk";
 const beforeSide = (lines: DiffLine[]) =>
-  lines.filter(
-    (l): l is LineEntry => l.type === "removed" || l.type === "unchanged",
-  );
+  lines
+    .filter(isLineEntry)
+    .filter((l) => l.type === "removed" || l.type === "unchanged");
 const afterSide = (lines: DiffLine[]) =>
-  lines.filter(
-    (l): l is LineEntry => l.type === "added" || l.type === "unchanged",
-  );
+  lines
+    .filter(isLineEntry)
+    .filter((l) => l.type === "added" || l.type === "unchanged");
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -295,7 +296,9 @@ describe("extractDiffLinesFromDom: Classic UI after expanding all context (large
   });
 
   it("leaves no line entry with empty content", () => {
-    const empty = lines().filter((l) => l.type !== "hunk" && l.content === "");
+    const empty = lines()
+      .filter(isLineEntry)
+      .filter((l) => l.content === "");
     expect(empty).toEqual([]);
   });
 
