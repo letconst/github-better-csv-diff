@@ -111,12 +111,7 @@ test("rows inserted while the header fetch is pending still rebuild the table", 
   site,
 }) => {
   const gate = hold();
-  site.raw.set(rawPath, {
-    status: 206,
-    body: headerLine,
-    release: gate.promise,
-  });
-  await openFixture(page, site, filesPath, largeFilePage);
+  await openLargeFile(page, site, gate.promise);
   await expect(page.locator(".csv-diff-loading")).toHaveCount(2);
   await stubNativeExpandUp(page);
   const before = await page.locator(beforeRows).count();
@@ -199,19 +194,20 @@ const previewPage = documentWith(fixtureHtml("preview-pr-split"));
 async function openPreview(page: Page, site: Site) {
   await page.addInitScript((sel) => {
     document.addEventListener("DOMContentLoaded", () => {
-      (window as unknown as { __region: string }).__region =
-        document.querySelector(sel)!.outerHTML;
+      const pristine = document.querySelector(sel)!.outerHTML;
+      (window as unknown as { __replaceRegion: () => void }).__replaceRegion =
+        () => {
+          const next = new DOMParser().parseFromString(pristine, "text/html")
+            .body.firstElementChild!;
+          document.querySelector(sel)!.replaceWith(next);
+        };
     });
   }, region);
   await openFixture(page, site, `${prPath}/changes`, previewPage);
   return () =>
-    page.evaluate((sel) => {
-      const old = document.querySelector(sel)!;
-      const html = (window as unknown as { __region: string }).__region;
-      const next = new DOMParser().parseFromString(html, "text/html").body
-        .firstElementChild!;
-      old.replaceWith(next);
-    }, region);
+    page.evaluate(() =>
+      (window as unknown as { __replaceRegion: () => void }).__replaceRegion(),
+    );
 }
 
 test("a region re-rendered by GitHub stays in Raw Diff when the user chose it", async ({
@@ -255,11 +251,7 @@ test("a region re-rendered by GitHub shows the CSV table before the debounce fir
   await openPreview(page, site);
 
   const { hasWrapper, nativeHidden } = await page.evaluate(async (sel) => {
-    const old = document.querySelector(sel)!;
-    const html = (window as unknown as { __region: string }).__region;
-    const next = new DOMParser().parseFromString(html, "text/html").body
-      .firstElementChild!;
-    old.replaceWith(next);
+    (window as unknown as { __replaceRegion: () => void }).__replaceRegion();
     await new Promise((r) => setTimeout(r, 0));
     return {
       hasWrapper: document.querySelector(`${sel} .csv-diff-wrapper`) !== null,
