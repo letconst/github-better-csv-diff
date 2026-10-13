@@ -162,10 +162,10 @@
 .csv-diff-row-gap td {
   background: var(--bgColor-accent-muted, var(--color-accent-subtle));
   padding: 0;
-  height: 24px;
   text-align: left;
 }
 
+/* Block-level so a down + up pair stacks vertically, as in GitHub's own hunk row */
 .csv-diff-expand-btn {
   background: transparent;
   border: 0;
@@ -173,7 +173,7 @@
   height: 24px;
   color: var(--fgColor-muted, var(--color-fg-muted));
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
 }
 
