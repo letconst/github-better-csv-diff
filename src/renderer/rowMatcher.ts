@@ -73,6 +73,7 @@ function buildRowTokens(
   // resolveHeaderAndData, or continuation lines of multi-line CSV fields whose
   // start line was already consumed) are silently skipped.
   for (const entry of alignment) {
+    if (entry.type === "hunk") continue;
     if (entry.type === "unchanged") {
       const bi =
         entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;

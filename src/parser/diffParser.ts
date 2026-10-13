@@ -5,18 +5,33 @@
 import { parseCsvWithLineMap } from "./csvParser";
 import type { UiConfig } from "./uiConfig";
 
-export interface DiffLine {
-  type: "added" | "removed" | "unchanged";
-  content: string;
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
+export interface Expander {
+  direction: "up" | "down" | "all";
+  label: string;
+  element: HTMLElement;
 }
 
-export interface DiffAlignment {
-  type: "removed" | "added" | "unchanged";
-  oldLineNumber: number | null;
-  newLineNumber: number | null;
+export interface HunkEntry {
+  type: "hunk";
+  expanders: Expander[];
 }
+
+export type DiffLine =
+  | {
+      type: "added" | "removed" | "unchanged";
+      content: string;
+      oldLineNumber: number | null;
+      newLineNumber: number | null;
+    }
+  | HunkEntry;
+
+export type DiffAlignment =
+  | {
+      type: "removed" | "added" | "unchanged";
+      oldLineNumber: number | null;
+      newLineNumber: number | null;
+    }
+  | HunkEntry;
 
 export interface CsvDiff {
   before: string[][];
@@ -39,6 +54,7 @@ export function getFirstLineNumbers(lines: DiffLine[]): {
   let firstBeforeLine: number | null = null;
   let firstAfterLine: number | null = null;
   for (const line of lines) {
+    if (line.type === "hunk") continue;
     if (
       firstBeforeLine === null &&
       (line.type === "removed" || line.type === "unchanged")
@@ -63,6 +79,7 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
   const afterLineNumbers: Array<number | null> = [];
 
   for (const line of lines) {
+    if (line.type === "hunk") continue;
     if (line.type === "removed" || line.type === "unchanged") {
       beforeLines.push(line.content);
       beforeLineNumbers.push(line.oldLineNumber);
@@ -81,11 +98,16 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     after: after.data,
     beforeLineNumbers: before.lineNumbers,
     afterLineNumbers: after.lineNumbers,
-    alignment: lines.map((line) => ({
-      type: line.type,
-      oldLineNumber: line.oldLineNumber,
-      newLineNumber: line.newLineNumber,
-    })),
+    alignment: lines.map(
+      (line): DiffAlignment =>
+        line.type === "hunk"
+          ? { type: "hunk", expanders: line.expanders }
+          : {
+              type: line.type,
+              oldLineNumber: line.oldLineNumber,
+              newLineNumber: line.newLineNumber,
+            },
+    ),
   };
 }
 
@@ -94,6 +116,17 @@ function isCellEmpty(cell: HTMLTableCellElement, ui: UiConfig): boolean {
   return (
     cell.classList.contains(ui.emptyClass) ||
     ui.extractLineNumber(cell) === null
+  );
+}
+
+function isHunkRow(
+  row: HTMLElement,
+  cells: NodeListOf<HTMLTableCellElement>,
+  ui: UiConfig,
+): boolean {
+  return (
+    cells[0]!.classList.contains(ui.hunkClass) ||
+    row.querySelector(ui.expanderSelector) !== null
   );
 }
 
@@ -120,7 +153,7 @@ export function extractDiffLinesFromDom(
   for (const row of rows) {
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
-    if (cells[0]!.classList.contains(ui.hunkClass)) continue;
+    if (isHunkRow(row, cells, ui)) continue;
     if (cells.length === 3) {
       isUnifiedLayout = true;
       break;
@@ -138,8 +171,16 @@ export function extractDiffLinesFromDom(
     const cells = row.querySelectorAll<HTMLTableCellElement>("td");
     if (cells.length === 0) continue;
 
-    // Hunk header
-    if (cells[0]!.classList.contains(ui.hunkClass)) {
+    if (isHunkRow(row, cells, ui)) {
+      const expanders = Array.from(
+        row.querySelectorAll<HTMLElement>(ui.expanderSelector),
+        (element): Expander => ({
+          direction: ui.expanderDirection(element),
+          label: element.getAttribute("aria-label") ?? "",
+          element,
+        }),
+      );
+      if (expanders.length > 0) result.push({ type: "hunk", expanders });
       continue;
     }
 

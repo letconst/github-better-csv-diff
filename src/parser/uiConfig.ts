@@ -20,6 +20,9 @@ export interface UiConfig {
    * directly below it, so its rendered height drives the sticky-top offset.
    */
   stickyFileHeaderSelector: string;
+  /** Selector for GitHub's native expand controls inside a hunk row. */
+  expanderSelector: string;
+  expanderDirection(el: HTMLElement): "up" | "down" | "all";
   extractContent(cell: HTMLTableCellElement): string;
   /** Extract text from a changed (added/removed) content cell, stripping diff marker if present. */
   extractChangedContent(cell: HTMLTableCellElement): string;
@@ -37,6 +40,11 @@ export const PREVIEW_UI: UiConfig = {
   contentSelector: ":scope > :nth-child(2)",
   actionsSelector: ':has(> [class*="MarkAsViewedButton"])',
   stickyFileHeaderSelector: 'div[class*="diffHeaderWrapper"]',
+  expanderSelector: "button[data-direction]",
+  expanderDirection: (el) => {
+    const d = el.dataset.direction;
+    return d === "up" || d === "down" ? d : "all";
+  },
   extractContent: (cell) => cell.textContent ?? "",
   extractChangedContent: (cell) => {
     const text = cell.textContent ?? "";
@@ -60,6 +68,15 @@ export const CLASSIC_UI: UiConfig = {
   contentSelector: ".js-file-content",
   actionsSelector: ".file-actions > .d-flex",
   stickyFileHeaderSelector: ".file-header",
+  expanderSelector: "a.js-expand",
+  expanderDirection: (el) => {
+    const label = el.getAttribute("aria-label");
+    return label === "Expand Up"
+      ? "up"
+      : label === "Expand Down"
+        ? "down"
+        : "all";
+  },
   extractContent: (cell) =>
     cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
   extractChangedContent: (cell) =>

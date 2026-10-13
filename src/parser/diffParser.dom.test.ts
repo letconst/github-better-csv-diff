@@ -8,6 +8,7 @@ import {
   diffToCsv,
   extractDiffLinesFromDom,
   getFirstLineNumbers,
+  type HunkEntry,
 } from "./diffParser";
 import { CLASSIC_UI, PREVIEW_UI, type UiConfig } from "./uiConfig";
 
@@ -84,10 +85,15 @@ function diffLineFactory(beforeFile: string, afterFile: string) {
   };
 }
 
+type LineEntry = Exclude<DiffLine, { type: "hunk" }>;
 const beforeSide = (lines: DiffLine[]) =>
-  lines.filter((l) => l.type !== "added");
+  lines.filter(
+    (l): l is LineEntry => l.type === "removed" || l.type === "unchanged",
+  );
 const afterSide = (lines: DiffLine[]) =>
-  lines.filter((l) => l.type !== "removed");
+  lines.filter(
+    (l): l is LineEntry => l.type === "added" || l.type === "unchanged",
+  );
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -201,6 +207,72 @@ describe("extractDiffLinesFromDom: Preview UI (wide.csv, commit 20765189)", () =
     );
   });
 });
+
+describe.each<[string, UiFixture, string, string, string, string]>([
+  [
+    "Preview UI",
+    PREVIEW,
+    "preview-pr-split-large-file",
+    "button[data-direction]",
+    "Expand file up from line 24",
+    "Expand file down from line 34",
+  ],
+  [
+    "Classic UI",
+    CLASSIC,
+    "classic-pr-split-large-file",
+    "a.js-expand",
+    "Expand Up",
+    "Expand Down",
+  ],
+])(
+  "extractDiffLinesFromDom: %s expanders (large-file.csv, PR #2)",
+  (_ui, ui, fixture, selector, upLabel, downLabel) => {
+    const hunks = (lines: DiffLine[]) =>
+      lines.filter((l): l is HunkEntry => l.type === "hunk");
+
+    it("leads with a hunk holding one up expander", () => {
+      const first = extracted(fixture, ui)[0]!;
+      expect(first.type).toBe("hunk");
+      const { expanders } = first as HunkEntry;
+      expect(expanders).toHaveLength(1);
+      expect(expanders[0]).toMatchObject({
+        direction: "up",
+        label: upLabel,
+      });
+      expect(expanders[0]!.element).toBeInstanceOf(HTMLElement);
+      expect(expanders[0]!.element.matches(selector)).toBe(true);
+    });
+
+    it("ends with a hunk holding one down expander", () => {
+      const last = extracted(fixture, ui).at(-1)!;
+      expect(last.type).toBe("hunk");
+      const { expanders } = last as HunkEntry;
+      expect(expanders).toHaveLength(1);
+      expect(expanders[0]).toMatchObject({
+        direction: "down",
+        label: downLabel,
+      });
+      expect(expanders[0]!.element.matches(selector)).toBe(true);
+    });
+
+    it("emits no other hunk entries", () => {
+      expect(hunks(extracted(fixture, ui))).toHaveLength(2);
+    });
+  },
+);
+
+describe.each<[string, UiFixture, string]>([
+  ["Preview UI", PREVIEW, "preview-pr-split"],
+  ["Classic UI", CLASSIC, "classic-pr-split"],
+])(
+  "extractDiffLinesFromDom: %s hunk row without controls (sample.csv)",
+  (_ui, ui, fixture) => {
+    it("emits no hunk entry", () => {
+      expect(extracted(fixture, ui).some((l) => l.type === "hunk")).toBe(false);
+    });
+  },
+);
 
 describe("extractDiffLinesFromDom: container without a diff table", () => {
   it.each<[string, UiConfig, string]>([
