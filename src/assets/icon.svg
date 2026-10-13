@@ -1,4 +1,5 @@
 <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <title>GitHub Better CSV Diff</title>
   <!-- 16px transparent padding → content in 96x96 at (16,16) -->
   <!-- Background -->
   <rect x="16" y="16" width="96" height="96" rx="17" fill="#f0f4f8"/>

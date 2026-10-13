@@ -32,8 +32,6 @@ const CSV_EXTENSIONS = [".csv", ".tsv"];
 
 let observer: MutationObserver | null = null;
 let debouncedCallback: CancellableCallback | null = null;
-// biome-ignore lint/correctness/noUnusedVariables: retained for future teardown
-let urlPollTimer: ReturnType<typeof setInterval> | null = null;
 let lifecycleInitialized = false;
 
 export function initObserverLifecycle(): void {
@@ -70,8 +68,9 @@ export function initObserverLifecycle(): void {
   // Poll for URL changes that bypass Turbo/PJAX events (e.g. GitHub PR tab
   // switches via pushState in the main world, invisible to content script's
   // isolated world). Safe if DOM isn't ready: processExistingDiffs is idempotent,
-  // and the MutationObserver will catch later inserts.
-  urlPollTimer = watchUrlChanges(syncObserverWithRoute);
+  // and the MutationObserver will catch later inserts. The interval lives for
+  // the page's lifetime by design, so its handle is not retained.
+  watchUrlChanges(syncObserverWithRoute);
 
   // Initial route check
   syncObserverWithRoute();
@@ -330,9 +329,9 @@ function processExistingDiffs(): void {
       }
 
       // Wrapper gone (collapse/re-expand rebuild, or removed just above).
-      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand.
+      // Keep PROCESSED_ATTR so CSS hides raw diff on re-expand, and the raw
+      // attribute so the user's Table View / Raw Diff choice survives it.
       teardownContainerState(container);
-      container.removeAttribute("data-csv-diff-raw");
     }
 
     const isClassic = container.hasAttribute("data-tagsearch-path");
@@ -605,19 +604,13 @@ function resolveFinalMode(
   return { mode: "default" };
 }
 
-/** Find the actions area in the header, with fallback for Preview UI. */
+/** Find the actions area in the header, with fallbacks for commit pages and Classic UI. */
 function findActionsArea(
   header: HTMLElement,
   config: UiConfig,
 ): HTMLElement | null {
   const area = header.querySelector<HTMLElement>(config.actionsSelector);
   if (area) return area;
-
-  // Fallback for Preview UI: locate via the "Viewed" button (aria-pressed toggle)
-  const viewedBtn = header.querySelector<HTMLElement>("button[aria-pressed]");
-  if (viewedBtn?.textContent?.trim() === "Viewed" && viewedBtn.parentElement) {
-    return viewedBtn.parentElement;
-  }
 
   // Fallback for commit page: locate via "More options" button's parent container.
   // The button may use aria-label or aria-labelledby (PR commit pages use the latter).
@@ -652,11 +645,16 @@ function findButtonByTooltipText(
   return null;
 }
 
-function createToggleButton(): HTMLButtonElement {
+function setToggleRaw(btn: HTMLButtonElement, raw: boolean): void {
+  btn.textContent = raw ? "Table View" : "Raw Diff";
+  btn.classList.toggle("csv-diff-toggle-active", !raw);
+}
+
+function createToggleButton(raw: boolean): HTMLButtonElement {
   const btn = document.createElement("button");
-  btn.className = "csv-diff-toggle-btn btn btn-sm csv-diff-toggle-active";
-  btn.textContent = "Raw Diff";
+  btn.className = "csv-diff-toggle-btn btn btn-sm";
   btn.type = "button";
+  setToggleRaw(btn, raw);
   return btn;
 }
 
@@ -678,12 +676,17 @@ function ensurePlaceholderToggle(
   container: HTMLElement,
   config: UiConfig,
 ): void {
-  if (container.querySelector(".csv-diff-toggle-btn")) return;
+  const existing = container.querySelector<HTMLButtonElement>(
+    ".csv-diff-toggle-btn",
+  );
+  // Runs on every observer pass; replacing an already-disabled toggle would retrigger it forever.
+  if (existing?.disabled) return;
 
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   if (!header) return;
 
-  const btn = createToggleButton();
+  existing?.remove();
+  const btn = createToggleButton(container.hasAttribute("data-csv-diff-raw"));
   btn.classList.remove("csv-diff-toggle-active");
   btn.disabled = true;
   btn.setAttribute("aria-disabled", "true");
@@ -706,8 +709,10 @@ function injectTableOverlay(
     return false;
   }
 
+  const raw = container.hasAttribute("data-csv-diff-raw");
   const wrapper = document.createElement("div");
   wrapper.className = "csv-diff-wrapper";
+  wrapper.style.display = raw ? "none" : "";
   wrapper.appendChild(tableElement);
 
   // Snapshot original children before prepending wrapper
@@ -719,14 +724,13 @@ function injectTableOverlay(
     }
   }
 
-  const toggleBtn = createToggleButton();
+  const toggleBtn = createToggleButton(raw);
 
   toggleBtn.addEventListener("click", () => {
     const isTableVisible = wrapper.style.display !== "none";
     wrapper.style.display = isTableVisible ? "none" : "";
     setOriginalChildrenVisible(isTableVisible);
-    toggleBtn.textContent = isTableVisible ? "Table View" : "Raw Diff";
-    toggleBtn.classList.toggle("csv-diff-toggle-active", !isTableVisible);
+    setToggleRaw(toggleBtn, isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
     // Re-sync sticky offset + column widths + row heights when toggling back to
@@ -740,7 +744,7 @@ function injectTableOverlay(
   insertToggleButton(header, config, toggleBtn);
 
   // Place wrapper inside diffBody so collapsing the file hides it too
-  setOriginalChildrenVisible(false);
+  setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
   setupTableObservers(tableElement, container, wrapper, config);
   return true;
@@ -751,11 +755,9 @@ function injectTableOverlay(
  * script's isolated world (e.g. pushState called by the page's main world).
  * Compares pathname only — query/hash changes don't affect route gating.
  */
-function watchUrlChanges(
-  onNavigate: () => void,
-): ReturnType<typeof setInterval> {
+function watchUrlChanges(onNavigate: () => void): void {
   let lastPathname = location.pathname;
-  return setInterval(() => {
+  setInterval(() => {
     if (location.pathname !== lastPathname) {
       lastPathname = location.pathname;
       onNavigate();

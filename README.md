@@ -34,22 +34,22 @@ GitHub's default diff view shows CSV changes as raw text, making it hard to see 
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
-- npm
+- [mise](https://mise.jdx.dev/) (installs the pinned Node.js and pnpm from `mise.toml`)
 
 ### Setup
 
 ```bash
 git clone https://github.com/letconst/github-better-csv-diff.git
 cd github-better-csv-diff
-npm install
+mise install
+pnpm install
 ```
 
 ### Dev server
 
 ```bash
-npm run dev            # Chrome (with HMR)
-npm run dev:firefox    # Firefox
+pnpm dev            # Chrome (with HMR)
+pnpm dev:firefox    # Firefox
 ```
 
 Load the unpacked extension:
@@ -59,8 +59,8 @@ Load the unpacked extension:
 ### Production build
 
 ```bash
-npm run build          # Chrome
-npm run build:firefox  # Firefox
+pnpm build          # Chrome
+pnpm build:firefox  # Firefox
 ```
 
 ## License

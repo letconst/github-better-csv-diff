@@ -35,7 +35,7 @@ export const PREVIEW_UI: UiConfig = {
   emptyClass: "empty-diff-line",
   headerSelector: ":scope > :first-child",
   contentSelector: ":scope > :nth-child(2)",
-  actionsSelector: '[class*="diffHeaderActionWrapper"], [class*="ActionGroup"]',
+  actionsSelector: ':has(> [class*="MarkAsViewedButton"])',
   stickyFileHeaderSelector: 'div[class*="diffHeaderWrapper"]',
   extractContent: (cell) => cell.textContent ?? "",
   extractChangedContent: (cell) => {

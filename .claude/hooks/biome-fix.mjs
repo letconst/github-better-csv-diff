@@ -8,5 +8,5 @@ const input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
 const filePath = input.tool_input?.file_path ?? "";
 
 if (/\.(ts|js|css)$/.test(filePath)) {
-  execSync(`npx biome check --fix "${filePath}"`, { stdio: "inherit" });
+  execSync(`pnpm exec biome check --fix "${filePath}"`, { stdio: "inherit" });
 }

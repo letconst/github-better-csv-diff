@@ -76,7 +76,7 @@ export function appendTextWithBreaks(
       }
       parent.appendChild(document.createElement("br"));
     }
-    parent.appendChild(document.createTextNode(parts[i]));
+    parent.appendChild(document.createTextNode(parts[i]!));
   }
 }
 
@@ -97,7 +97,7 @@ function appendHighlightedWithBreaks(
     }
     const span = document.createElement("span");
     span.className = className;
-    span.appendChild(document.createTextNode(parts[i]));
+    span.appendChild(document.createTextNode(parts[i]!));
     fragment.appendChild(span);
   }
 }
