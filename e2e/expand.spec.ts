@@ -1,11 +1,13 @@
 import type { Page } from "@playwright/test";
 import {
+  commitPath,
   documentWith,
   expect,
   filesPath,
   fixtureHtml,
   hold,
   openFixture,
+  prPath,
   type Site,
   test,
 } from "./fixtures";
@@ -124,4 +126,83 @@ test("rows inserted while the header fetch is pending still rebuild the table", 
   await expect(page.locator(beforeRows)).toHaveCount(before + 3);
   await expect(page.locator(".csv-diff-loading")).toHaveCount(0);
   await expect(page.locator(".csv-diff-wrapper")).toHaveCount(1);
+});
+
+const region = 'div[role="region"]';
+const previewPage = documentWith(fixtureHtml("preview-pr-split"));
+
+/** Opens the Preview page and returns a function that swaps the region for a pristine copy, as GitHub does on expand. */
+async function openPreview(page: Page, site: Site) {
+  await page.addInitScript((sel) => {
+    document.addEventListener("DOMContentLoaded", () => {
+      (window as unknown as { __region: string }).__region =
+        document.querySelector(sel)!.outerHTML;
+    });
+  }, region);
+  await openFixture(page, site, `${prPath}/changes`, previewPage);
+  return () =>
+    page.evaluate((sel) => {
+      const old = document.querySelector(sel)!;
+      const html = (window as unknown as { __region: string }).__region;
+      const next = new DOMParser().parseFromString(html, "text/html").body
+        .firstElementChild!;
+      old.replaceWith(next);
+    }, region);
+}
+
+test("a region re-rendered by GitHub stays in Raw Diff when the user chose it", async ({
+  page,
+  site,
+}) => {
+  const replaceRegion = await openPreview(page, site);
+  await page.locator(".csv-diff-toggle-btn").click();
+  await expect(page.locator(".csv-diff-wrapper")).toBeHidden();
+
+  await replaceRegion();
+
+  const toggle = page.locator(`${region} .csv-diff-toggle-btn`);
+  await expect(toggle).toHaveText("Table View");
+  await expect(page.locator(region)).toHaveAttribute("data-csv-diff-raw", "");
+  await expect(page.locator(".csv-diff-wrapper")).toHaveCSS("display", "none");
+  await expect(page.locator('table[role="grid"]').first()).not.toHaveCSS(
+    "display",
+    "none",
+  );
+});
+
+test("a region re-rendered by GitHub stays in Table View when the user did not switch", async ({
+  page,
+  site,
+}) => {
+  const replaceRegion = await openPreview(page, site);
+  await replaceRegion();
+
+  await expect(page.locator(`${region} .csv-diff-toggle-btn`)).toHaveText(
+    "Raw Diff",
+  );
+  await expect(page.locator(".csv-diff-wrapper")).toBeVisible();
+  await expect(page.locator(region)).not.toHaveAttribute("data-csv-diff-raw");
+});
+
+test("the Raw Diff choice does not leak to the same file on another diff route", async ({
+  page,
+  site,
+}) => {
+  await openPreview(page, site);
+  await page.locator(".csv-diff-toggle-btn").click();
+  await expect(page.locator(".csv-diff-wrapper")).toBeHidden();
+
+  await page.evaluate(
+    ({ path, html }) => {
+      history.pushState({}, "", path);
+      document.body.innerHTML = html;
+    },
+    { path: commitPath, html: fixtureHtml("preview-pr-split") },
+  );
+
+  await expect(page.locator(`${region} .csv-diff-toggle-btn`)).toHaveText(
+    "Raw Diff",
+    { timeout: 3000 },
+  );
+  await expect(page.locator(".csv-diff-wrapper")).toBeVisible();
 });

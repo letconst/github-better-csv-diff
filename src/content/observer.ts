@@ -34,6 +34,14 @@ let observer: MutationObserver | null = null;
 let debouncedCallback: CancellableCallback | null = null;
 let lifecycleInitialized = false;
 
+// Preview UI replaces the whole region node when a native expand button is
+// clicked, dropping the container attribute, so the Raw Diff choice is kept here.
+const rawChoices = new Map<string, boolean>();
+
+function rawChoiceKey(filename: string): string {
+  return `${location.pathname}\n${filename}`;
+}
+
 export function initObserverLifecycle(): void {
   if (lifecycleInitialized) return;
   lifecycleInitialized = true;
@@ -105,6 +113,7 @@ function disconnectObserver(): void {
   // Clear cached revision context and header cache on navigation
   clearRevisionContextCache();
   clearHeaderCache();
+  rawChoices.clear();
   // Disconnect per-table ResizeObservers and cancel pending rAFs so they don't
   // leak across navigations / Turbo snapshot caching.
   teardownAllContainerStates();
@@ -422,7 +431,15 @@ function processCsvDiffBlock(
     if (!needsBeforeHeader && !needsAfterHeader) {
       // No header fetch needed — render as before
       const tableElement = renderDiffTable(csvDiff);
-      if (injectTableOverlay(container, tableElement, config, nativeRowCount)) {
+      if (
+        injectTableOverlay(
+          container,
+          tableElement,
+          config,
+          nativeRowCount,
+          filename,
+        )
+      ) {
         container.setAttribute(PROCESSED_ATTR, "true");
       }
       return;
@@ -440,7 +457,15 @@ function processCsvDiffBlock(
       willFetchAfter,
     );
     const tableElement = renderDiffTable(csvDiff, options);
-    if (!injectTableOverlay(container, tableElement, config, nativeRowCount))
+    if (
+      !injectTableOverlay(
+        container,
+        tableElement,
+        config,
+        nativeRowCount,
+        filename,
+      )
+    )
       return;
     container.setAttribute(PROCESSED_ATTR, "true");
 
@@ -723,6 +748,7 @@ function injectTableOverlay(
   tableElement: HTMLElement,
   config: UiConfig,
   nativeRowCount: number,
+  filename: string,
 ): boolean {
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   const diffBody = container.querySelector<HTMLElement>(config.contentSelector);
@@ -734,7 +760,11 @@ function injectTableOverlay(
     return false;
   }
 
-  const raw = container.hasAttribute("data-csv-diff-raw");
+  const choiceKey = rawChoiceKey(filename);
+  const raw =
+    container.hasAttribute("data-csv-diff-raw") ||
+    rawChoices.get(choiceKey) === true;
+  container.toggleAttribute("data-csv-diff-raw", raw);
   const wrapper = document.createElement("div");
   wrapper.className = "csv-diff-wrapper";
   wrapper.style.display = raw ? "none" : "";
@@ -758,6 +788,7 @@ function injectTableOverlay(
     setToggleRaw(toggleBtn, isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
+    rawChoices.set(choiceKey, isTableVisible);
     // Re-sync sticky offset + column widths + row heights when toggling back to
     // table view (all read 0 while the wrapper was display:none).
     if (!isTableVisible) {
