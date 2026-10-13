@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DiffAlignment } from "../parser/diffParser";
+import type { DiffAlignment, Expander } from "../parser/diffParser";
 import { type MatchedRow, matchRows } from "./rowMatcher";
 
 const same = (oldN: number, newN: number): DiffAlignment => ({
@@ -19,7 +19,7 @@ const came = (newN: number): DiffAlignment => ({
 });
 
 const row = (
-  type: MatchedRow["type"],
+  type: Exclude<MatchedRow["type"], "gap">,
   before: string[] | null,
   after: string[] | null,
   beforeLineNumber: number | null,
@@ -271,6 +271,76 @@ describe("matchRows line numbers", () => {
     expect(matchRows([A, A2], [A], [2], [], [])).toEqual([
       row("unchanged", A, A, 2, null),
       row("removed", A2, null, null, null),
+    ]);
+  });
+});
+
+describe("matchRows gap rows", () => {
+  const expanders: Expander[] = [
+    {
+      direction: "up",
+      label: "Expand Up",
+      element: {} as HTMLElement,
+    },
+  ];
+  const hunk: DiffAlignment = { type: "hunk", expanders };
+  const gapRow: MatchedRow = {
+    type: "gap",
+    expanders,
+    before: null,
+    after: null,
+    beforeLineNumber: null,
+    afterLineNumber: null,
+  };
+
+  it("emits a gap row at a hunk entry between unchanged rows, carrying the same expanders", () => {
+    const rows = matchRows(
+      [A, B],
+      [A, B],
+      [2, 9],
+      [2, 9],
+      [same(2, 2), hunk, same(9, 9)],
+    );
+    expect(rows).toEqual([
+      row("unchanged", A, A, 2, 2),
+      gapRow,
+      row("unchanged", B, B, 9, 9),
+    ]);
+    expect(rows[1]!.type === "gap" && rows[1]!.expanders).toBe(expanders);
+  });
+
+  it("does not pair a removed row before a gap with an added row after it", () => {
+    expect(matchRows([A], [B], [2], [20], [gone(2), hunk, came(20)])).toEqual([
+      row("removed", A, null, 2, null),
+      gapRow,
+      row("added", null, B, null, 20),
+    ]);
+  });
+
+  it("emits a leading hunk as a gap row at index 0 and matches the rest as usual", () => {
+    expect(
+      matchRows([A, B], [A, B], [5, 6], [5, 6], [hunk, same(5, 5), same(6, 6)]),
+    ).toEqual([
+      gapRow,
+      row("unchanged", A, A, 5, 5),
+      row("unchanged", B, B, 6, 6),
+    ]);
+  });
+
+  it("keeps the alignment path with a gap present, so diff order wins over key matching", () => {
+    const rows = matchRows(
+      [A, B, C],
+      [B, C, A],
+      [2, 3, 4],
+      [2, 3, 4],
+      [gone(2), hunk, same(3, 2), same(4, 3), came(4)],
+    );
+    expect(rows.map((r) => r.type)).toEqual([
+      "removed",
+      "gap",
+      "unchanged",
+      "unchanged",
+      "added",
     ]);
   });
 });

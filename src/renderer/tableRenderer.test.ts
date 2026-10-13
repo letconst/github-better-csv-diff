@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type CsvDiff,
   type DiffAlignment,
   type DiffLine,
   diffToCsv,
+  type Expander,
 } from "../parser/diffParser";
 import { renderDiffTable, type SideHeaderMode } from "./tableRenderer";
 
@@ -710,5 +711,115 @@ describe("renderDiffTable: missing line numbers", () => {
     expect(lineNum(bodyRows(el, 0)[0]!)).toBe(NBSP);
     expect(lineNum(bodyRows(el, 1)[0]!)).toBe(NBSP);
     expect(values(bodyRows(el, 0)[0]!)).toEqual(["a", "b"]);
+  });
+});
+
+describe("renderDiffTable: expand gap rows", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  const nativeButton = (): HTMLElement => {
+    const el = document.createElement("button");
+    document.body.appendChild(el);
+    return el;
+  };
+
+  const gapDiff = (expanders: Expander[]): CsvDiff =>
+    csvDiff(
+      [
+        ["id", "v"],
+        ["1", "a"],
+        ["5", "b"],
+      ],
+      [
+        ["id", "v"],
+        ["1", "a"],
+        ["5", "B"],
+      ],
+      [1, 2, 6],
+      [1, 2, 6],
+      [same(1, 1), same(2, 2), { type: "hunk", expanders }, same(6, 6)],
+    );
+
+  const twoExpanders = (): Expander[] => [
+    { direction: "up", label: "Expand Up", element: nativeButton() },
+    { direction: "down", label: "Expand Down", element: nativeButton() },
+  ];
+
+  const isGap = (tr: Element) => tr.classList.contains("csv-diff-row-gap");
+  const gapButtons = (el: HTMLElement, i: 0 | 1) => [
+    ...bodyRows(el, i)
+      .find(isGap)!
+      .querySelectorAll<HTMLButtonElement>(".csv-diff-expand-btn"),
+  ];
+
+  it("renders one labelled button per expander at the same row index on both sides", () => {
+    const el = renderDiffTable(gapDiff(twoExpanders()));
+    const gapIndex = bodyRows(el, 0).findIndex(isGap);
+    expect(gapIndex).toBeGreaterThan(-1);
+    expect(bodyRows(el, 1).findIndex(isGap)).toBe(gapIndex);
+    for (const i of [0, 1] as const) {
+      const buttons = gapButtons(el, i);
+      expect(buttons.map((b) => b.dataset.direction)).toEqual(["up", "down"]);
+      expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+        "Expand Up",
+        "Expand Down",
+      ]);
+    }
+  });
+
+  it("disables the gap's buttons on both sides and clicks the native control once", () => {
+    const expanders = twoExpanders();
+    const click = vi.spyOn(expanders[0]!.element, "click");
+    const el = renderDiffTable(gapDiff(expanders));
+    document.body.appendChild(el);
+    gapButtons(el, 0)[0]!.click();
+    expect(click).toHaveBeenCalledTimes(1);
+    for (const i of [0, 1] as const) {
+      expect(gapButtons(el, i).every((b) => b.disabled)).toBe(true);
+    }
+  });
+
+  it("renders a clicked gap's buttons disabled on both sides of a rebuilt table", () => {
+    const diff = gapDiff(twoExpanders());
+    const first = renderDiffTable(diff);
+    document.body.appendChild(first);
+    gapButtons(first, 0)[0]!.click();
+
+    const second = renderDiffTable(diff);
+    for (const i of [0, 1] as const) {
+      const buttons = gapButtons(second, i);
+      expect(buttons).toHaveLength(2);
+      expect(buttons.map((b) => b.disabled)).toEqual([true, true]);
+    }
+  });
+
+  it("warns and re-enables the buttons when the native control is detached", () => {
+    const expanders = twoExpanders();
+    expanders[0]!.element.remove();
+    const click = vi.spyOn(expanders[0]!.element, "click");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const el = renderDiffTable(gapDiff(expanders));
+    gapButtons(el, 1)[0]!.click();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(click).not.toHaveBeenCalled();
+    for (const i of [0, 1] as const) {
+      expect(gapButtons(el, i).some((b) => b.disabled)).toBe(false);
+    }
+  });
+
+  it("still highlights a modified row that follows a gap row", () => {
+    const el = renderDiffTable(gapDiff(twoExpanders()));
+    const last = (i: 0 | 1) => bodyRows(el, i).at(-1)!;
+    expect(dataCells(last(0)).map(hasClass("csv-diff-cell-removed"))).toEqual([
+      false,
+      true,
+    ]);
+    expect(dataCells(last(1)).map(hasClass("csv-diff-cell-changed"))).toEqual([
+      false,
+      true,
+    ]);
   });
 });

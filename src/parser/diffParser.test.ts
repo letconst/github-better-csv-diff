@@ -1,5 +1,11 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { type DiffLine, diffToCsv, getFirstLineNumbers } from "./diffParser";
+import {
+  type DiffLine,
+  diffToCsv,
+  getFirstLineNumbers,
+  type HunkEntry,
+} from "./diffParser";
 
 const unchanged = (content: string, n: number, m = n): DiffLine => ({
   type: "unchanged",
@@ -140,5 +146,43 @@ describe("diffToCsv", () => {
     const result = diffToCsv([added('line two"', 12), added("2,x", 13)]);
     expect(result.after).toEqual([['line two"'], ["2", "x"]]);
     expect(result.afterLineNumbers).toEqual([12, 13]);
+  });
+});
+
+describe("hunk entries", () => {
+  const hunk: HunkEntry = {
+    type: "hunk",
+    expanders: [
+      {
+        direction: "down",
+        label: "Expand file down from line 3",
+        element: document.createElement("button"),
+      },
+    ],
+  };
+
+  it("getFirstLineNumbers ignores a leading hunk entry", () => {
+    expect(getFirstLineNumbers([hunk, unchanged("a,b", 24)])).toEqual({
+      firstBeforeLine: 24,
+      firstAfterLine: 24,
+    });
+  });
+
+  it("diffToCsv keeps the hunk out of before/after and passes it through alignment", () => {
+    const diff = diffToCsv([unchanged("a,b", 1), hunk, unchanged("c,d", 9)]);
+    expect(diff.before).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+    expect(diff.after).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+    expect(diff.beforeLineNumbers).toEqual([1, 9]);
+    expect(diff.alignment).toHaveLength(3);
+    expect(diff.alignment[1]).toEqual({
+      type: "hunk",
+      expanders: hunk.expanders,
+    });
   });
 });

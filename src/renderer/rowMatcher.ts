@@ -1,12 +1,21 @@
-import type { DiffAlignment } from "../parser/diffParser";
+import type { DiffAlignment, Expander } from "../parser/diffParser";
 
-export interface MatchedRow {
-  before: string[] | null;
-  after: string[] | null;
-  type: "added" | "removed" | "modified" | "unchanged";
-  beforeLineNumber: number | null;
-  afterLineNumber: number | null;
-}
+export type MatchedRow =
+  | {
+      before: string[] | null;
+      after: string[] | null;
+      type: "added" | "removed" | "modified" | "unchanged";
+      beforeLineNumber: number | null;
+      afterLineNumber: number | null;
+    }
+  | {
+      type: "gap";
+      expanders: Expander[];
+      before: null;
+      after: null;
+      beforeLineNumber: null;
+      afterLineNumber: null;
+    };
 
 function lineNumAt(nums: Array<number | null>, i: number): number | null {
   return nums[i] ?? null;
@@ -42,11 +51,13 @@ export function matchRows(
 
 // --- Alignment-based matching ---
 
-interface RowToken {
-  type: "removed" | "added" | "unchanged";
-  beforeIndex: number | null;
-  afterIndex: number | null;
-}
+type RowToken =
+  | {
+      type: "removed" | "added" | "unchanged";
+      beforeIndex: number | null;
+      afterIndex: number | null;
+    }
+  | { type: "gap"; expanders: Expander[] };
 
 function buildRowTokens(
   alignment: DiffAlignment[],
@@ -73,6 +84,10 @@ function buildRowTokens(
   // resolveHeaderAndData, or continuation lines of multi-line CSV fields whose
   // start line was already consumed) are silently skipped.
   for (const entry of alignment) {
+    if (entry.type === "hunk") {
+      tokens.push({ type: "gap", expanders: entry.expanders });
+      continue;
+    }
     if (entry.type === "unchanged") {
       const bi =
         entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;
@@ -101,11 +116,15 @@ function buildRowTokens(
   return tokens;
 }
 
-interface PairedToken {
-  type: "removed" | "added" | "modified" | "unchanged";
-  beforeIndex: number | null;
-  afterIndex: number | null;
-}
+type PairedToken =
+  | {
+      type: "removed" | "added" | "modified" | "unchanged";
+      beforeIndex: number | null;
+      afterIndex: number | null;
+    }
+  | { type: "gap"; expanders: Expander[] };
+
+type BlockToken = Exclude<RowToken, { type: "gap" | "unchanged" }>;
 
 function pairBlocks(
   tokens: RowToken[],
@@ -116,7 +135,7 @@ function pairBlocks(
   let i = 0;
 
   while (i < tokens.length) {
-    if (tokens[i]!.type === "unchanged") {
+    if (tokens[i]!.type === "unchanged" || tokens[i]!.type === "gap") {
       result.push(tokens[i]!);
       i++;
       continue;
@@ -125,15 +144,17 @@ function pairBlocks(
     // Collect all non-unchanged tokens until the next unchanged (or end).
     // Split layout may interleave removed/added, so we keep the original
     // order for fallback while separating into removed/added for pairing.
-    const blockTokens: RowToken[] = [];
-    const removedBlock: RowToken[] = [];
-    const addedBlock: RowToken[] = [];
-    while (i < tokens.length && tokens[i]!.type !== "unchanged") {
-      blockTokens.push(tokens[i]!);
-      if (tokens[i]!.type === "removed") {
-        removedBlock.push(tokens[i]!);
+    const blockTokens: BlockToken[] = [];
+    const removedBlock: BlockToken[] = [];
+    const addedBlock: BlockToken[] = [];
+    while (i < tokens.length) {
+      const t = tokens[i]!;
+      if (t.type === "unchanged" || t.type === "gap") break;
+      blockTokens.push(t);
+      if (t.type === "removed") {
+        removedBlock.push(t);
       } else {
-        addedBlock.push(tokens[i]!);
+        addedBlock.push(t);
       }
       i++;
     }
@@ -163,9 +184,9 @@ function pairBlocks(
 }
 
 function tryPairBlock(
-  removedBlock: RowToken[],
-  addedBlock: RowToken[],
-  blockTokens: RowToken[],
+  removedBlock: BlockToken[],
+  addedBlock: BlockToken[],
+  blockTokens: BlockToken[],
   beforeData: string[][],
   afterData: string[][],
 ): PairedToken[] {
@@ -278,12 +299,23 @@ function matchByAlignment(
   const rows: MatchedRow[] = [];
 
   for (const p of paired) {
+    if (p.type === "gap") {
+      rows.push({
+        type: "gap",
+        expanders: p.expanders,
+        before: null,
+        after: null,
+        beforeLineNumber: null,
+        afterLineNumber: null,
+      });
+      continue;
+    }
     const bi = p.beforeIndex;
     const ai = p.afterIndex;
     const beforeRow = bi != null ? beforeData[bi]! : null;
     const afterRow = ai != null ? afterData[ai]! : null;
 
-    let type: MatchedRow["type"];
+    let type: Exclude<MatchedRow["type"], "gap">;
     if (p.type === "removed") {
       type = "removed";
     } else if (p.type === "added") {
