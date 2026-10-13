@@ -2,7 +2,7 @@
  * Renders side-by-side (Before / After) diff tables from parsed CSV data.
  */
 
-import type { CsvDiff } from "../parser/diffParser";
+import type { CsvDiff, Expander } from "../parser/diffParser";
 import {
   appendTextWithBreaks,
   computeInlineDiff,
@@ -10,6 +10,14 @@ import {
   renderInlineBefore,
 } from "./inlineDiff";
 import { type MatchedRow, matchRows } from "./rowMatcher";
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const EXPAND_ICON_PATHS: Record<Expander["direction"], string> = {
+  up: "M7.823 1.677 4.927 4.573A.25.25 0 0 0 5.104 5H7.25v3.236a.75.75 0 1 0 1.5 0V5h2.146a.25.25 0 0 0 .177-.427L8.177 1.677a.25.25 0 0 0-.354 0ZM13.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Zm-3.75.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75ZM7.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5ZM4 11.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75ZM1.75 11a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z",
+  down: "m8.177 14.323 2.896-2.896a.25.25 0 0 0-.177-.427H8.75V7.764a.75.75 0 1 0-1.5 0V11H5.104a.25.25 0 0 0-.177.427l2.896 2.896a.25.25 0 0 0 .354 0ZM2.25 5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 4.25a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75ZM8.25 5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 4.25a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z",
+  all: "m8.177.677 2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25a.75.75 0 0 1-1.5 0V4H5.104a.25.25 0 0 1-.177-.427L7.823.677a.25.25 0 0 1 .354 0ZM7.25 10.75a.75.75 0 0 1 1.5 0V12h2.146a.25.25 0 0 1 .177.427l-2.896 2.896a.25.25 0 0 1-.354 0l-2.896-2.896A.25.25 0 0 1 5.104 12H7.25v-1.25Zm-5-2a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z",
+};
 
 export interface SideHeaderMode {
   mode: "default" | "external" | "loading";
@@ -152,8 +160,9 @@ export function syncColumnWidths(container: HTMLElement): void {
     // Measure from the body alone while any header cell spans multiple columns.
     const hasSpanningHeaderCell = headerCells.some((cell) => cell.colSpan > 1);
     const bodyCells =
-      bodyTable.querySelector<HTMLTableRowElement>("tbody tr")?.children ??
-      null;
+      bodyTable.querySelector<HTMLTableRowElement>(
+        "tbody tr:not(.csv-diff-row-gap)",
+      )?.children ?? null;
     const widths = new Array<number>(n);
     for (let c = 0; c < n; c++) {
       const headerWidth = hasSpanningHeaderCell
@@ -260,6 +269,7 @@ export function renderDiffTable(
   );
 
   highlightChangedCells(container, matched);
+  bindExpandButtons(container, matched);
 
   // Synchronize horizontal scroll between Before and After sides. The body is
   // the only horizontal scroll container; mirror its scrollLeft to the other
@@ -291,6 +301,62 @@ export function renderDiffTable(
   }
 
   return container;
+}
+
+function bindExpandButtons(
+  container: HTMLElement,
+  matched: MatchedRow[],
+): void {
+  matched.forEach((match, index) => {
+    if (match.type !== "gap") return;
+    const buttons = container.querySelectorAll<HTMLButtonElement>(
+      `tr.csv-diff-row-gap[data-gap-index="${index}"] .csv-diff-expand-btn`,
+    );
+    const setDisabled = (disabled: boolean) => {
+      for (const b of buttons) b.disabled = disabled;
+    };
+    for (const button of buttons) {
+      const expander = match.expanders[Number(button.dataset.expanderIndex)]!;
+      button.addEventListener("click", () => {
+        setDisabled(true);
+        if (expander.element.isConnected) {
+          expander.element.click();
+          return;
+        }
+        console.warn(
+          "[GitHub Better CSV Diff] Native expand control is gone",
+          expander.label,
+        );
+        setDisabled(false);
+      });
+    }
+  });
+}
+
+function buildExpandButton(
+  expander: Expander,
+  expanderIndex: number,
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "csv-diff-expand-btn";
+  button.dataset.direction = expander.direction;
+  button.dataset.expanderIndex = String(expanderIndex);
+  button.setAttribute("aria-label", expander.label);
+  button.title = expander.label;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "csv-diff-expand-icon");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("fill", "currentColor");
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", EXPAND_ICON_PATHS[expander.direction]);
+  svg.appendChild(path);
+  button.appendChild(svg);
+  return button;
 }
 
 function buildSide(
@@ -385,7 +451,20 @@ function buildBodyTable(
 
   const tbody = document.createElement("tbody");
 
-  for (const match of matched) {
+  matched.forEach((match, index) => {
+    if (match.type === "gap") {
+      const gapTr = document.createElement("tr");
+      gapTr.className = "csv-diff-row-gap";
+      gapTr.dataset.gapIndex = String(index);
+      const gapTd = document.createElement("td");
+      gapTd.colSpan = colCount;
+      match.expanders.forEach((expander, i) => {
+        gapTd.appendChild(buildExpandButton(expander, i));
+      });
+      gapTr.appendChild(gapTd);
+      tbody.appendChild(gapTr);
+      return;
+    }
     const row = side === "before" ? match.before : match.after;
     const lineNum =
       side === "before" ? match.beforeLineNumber : match.afterLineNumber;
@@ -418,7 +497,7 @@ function buildBodyTable(
     }
 
     tbody.appendChild(tr);
-  }
+  });
 
   table.appendChild(tbody);
   bodyDiv.appendChild(table);
@@ -437,6 +516,7 @@ function highlightChangedCells(
 
   for (let i = 0; i < matched.length; i++) {
     const match = matched[i]!;
+    if (match.type === "gap") continue;
     if (match.type !== "modified" || !match.before || !match.after) continue;
 
     const beforeTr = beforeRows[i];

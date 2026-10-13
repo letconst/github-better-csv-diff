@@ -158,6 +158,35 @@
   user-select: none;
 }
 
+/* Expand-context row (drives GitHub's native expand controls) */
+.csv-diff-row-gap td {
+  background: var(--bgColor-accent-muted, var(--color-accent-subtle));
+  padding: 0;
+  height: 24px;
+  text-align: left;
+}
+
+.csv-diff-expand-btn {
+  background: transparent;
+  border: 0;
+  padding: 0 8px;
+  height: 24px;
+  color: var(--fgColor-muted, var(--color-fg-muted));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.csv-diff-expand-btn:hover:not(:disabled) {
+  background: var(--bgColor-accent-emphasis, var(--color-accent-emphasis));
+  color: var(--fgColor-onEmphasis, var(--color-fg-on-emphasis));
+}
+
+.csv-diff-expand-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 /* Line number column */
 .csv-diff-line-num {
   width: 1px;
