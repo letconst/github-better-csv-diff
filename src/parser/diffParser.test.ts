@@ -147,6 +147,43 @@ describe("diffToCsv", () => {
     expect(result.after).toEqual([['line two"'], ["2", "x"]]);
     expect(result.afterLineNumbers).toEqual([12, 13]);
   });
+
+  it("parses each hunk as its own segment so an open quote at a hunk end does not swallow the next hunk", () => {
+    // #68
+    const result = diffToCsv([
+      removed('1,"old', 10),
+      added('1,"new', 10),
+      unchanged("visible", 11),
+      unchanged("2,ok", 30),
+    ]);
+    expect(result.before.at(-1)).toEqual(["2", "ok"]);
+    expect(result.after.at(-1)).toEqual(["2", "ok"]);
+    expect(result.beforeLineNumbers.at(-1)).toBe(30);
+    expect(result.afterLineNumbers.at(-1)).toBe(30);
+  });
+
+  it("characterization: a hunk ending inside a quoted record renders the cut fragment as its own rows", () => {
+    // #68, mirror of #55
+    const result = diffToCsv([
+      removed('1,"old', 10),
+      added('1,"new', 10),
+      unchanged("visible", 11),
+      unchanged('tail"', 30),
+      unchanged("2,ok", 31),
+    ]);
+    expect(result.before).toEqual([
+      ["1", "old\nvisible"],
+      ['tail"'],
+      ["2", "ok"],
+    ]);
+    expect(result.after).toEqual([
+      ["1", "new\nvisible"],
+      ['tail"'],
+      ["2", "ok"],
+    ]);
+    expect(result.beforeLineNumbers).toEqual([10, 30, 31]);
+    expect(result.afterLineNumbers).toEqual([10, 30, 31]);
+  });
 });
 
 describe("hunk entries", () => {
