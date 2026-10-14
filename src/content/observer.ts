@@ -4,7 +4,7 @@
  * Supports PR pages, commit pages, and both Preview UI and Classic UI.
  */
 
-import type { CsvDiff } from "../parser/diffParser";
+import type { CsvDiff, DiffLine } from "../parser/diffParser";
 import {
   diffToCsv,
   extractDiffLinesFromDom,
@@ -18,6 +18,7 @@ import {
   syncColumnWidths,
   syncRowHeights,
 } from "../renderer/tableRenderer";
+import { clearFileCache, fetchFileText } from "./fileFetcher";
 import { clearHeaderCache, fetchCsvHeaderRow } from "./headerFetcher";
 import {
   clearRevisionContextCache,
@@ -141,6 +142,7 @@ function disconnectObserver(): void {
   // Clear cached revision context and header cache on navigation
   clearRevisionContextCache();
   clearHeaderCache();
+  clearFileCache();
   rawChoices.clear();
   processedContainerIds.clear();
   // Disconnect per-table ResizeObservers and cancel pending rAFs so they don't
@@ -458,35 +460,35 @@ function processCsvDiffBlock(
     const needsBeforeHeader = firstBeforeLine !== null && firstBeforeLine !== 1;
     const needsAfterHeader = firstAfterLine !== null && firstAfterLine !== 1;
 
-    if (!needsBeforeHeader && !needsAfterHeader) {
-      // No header fetch needed — render as before
-      const tableElement = renderDiffTable(csvDiff);
-      if (injectTableOverlay(container, tableElement, config, filename)) {
-        container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
-      }
-      return;
-    }
-
-    // At least one side needs a fetched header
     const ctx = getRevisionContext();
+    const willFetchBeforeFile =
+      Boolean(ctx?.baseRef) && csvDiff.beforeCut.some(Boolean);
+    const willFetchAfterFile =
+      Boolean(ctx?.headRef) && csvDiff.afterCut.some(Boolean);
+
     const willFetchBefore = needsBeforeHeader && Boolean(ctx?.baseRef);
     const willFetchAfter = needsAfterHeader && Boolean(ctx?.headRef);
-    const options = buildInitialRenderOptions(
-      csvDiff,
-      needsBeforeHeader,
-      needsAfterHeader,
-      willFetchBefore,
-      willFetchAfter,
-    );
+    const anyFetch =
+      willFetchBefore ||
+      willFetchAfter ||
+      willFetchBeforeFile ||
+      willFetchAfterFile;
+    const options: RenderOptions = {
+      ...buildInitialRenderOptions(
+        csvDiff,
+        needsBeforeHeader,
+        needsAfterHeader,
+        willFetchBefore,
+        willFetchAfter,
+      ),
+      loading: { before: willFetchBeforeFile, after: willFetchAfterFile },
+    };
     const tableElement = renderDiffTable(csvDiff, options);
     if (!injectTableOverlay(container, tableElement, config, filename)) return;
     container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
 
-    if (!willFetchBefore && !willFetchAfter) {
-      return;
-    }
+    if (!anyFetch) return;
 
-    // Async fetch headers and re-render
     const wrapper = container.querySelector(".csv-diff-wrapper");
     if (!wrapper || !ctx) return;
 
@@ -494,6 +496,7 @@ function processCsvDiffBlock(
       wrapper: wrapper as HTMLElement,
       container,
       config,
+      diffLines,
       csvDiff,
       owner: ctx.owner,
       repo: ctx.repo,
@@ -502,6 +505,8 @@ function processCsvDiffBlock(
       filepath: filename,
       willFetchBefore,
       willFetchAfter,
+      willFetchBeforeFile,
+      willFetchAfterFile,
       needsBeforeHeader,
       needsAfterHeader,
     });
@@ -562,6 +567,7 @@ interface FetchAndRerenderParams {
   wrapper: HTMLElement;
   container: HTMLElement;
   config: UiConfig;
+  diffLines: DiffLine[];
   csvDiff: CsvDiff;
   owner: string;
   repo: string;
@@ -570,6 +576,8 @@ interface FetchAndRerenderParams {
   filepath: string;
   willFetchBefore: boolean;
   willFetchAfter: boolean;
+  willFetchBeforeFile: boolean;
+  willFetchAfterFile: boolean;
   needsBeforeHeader: boolean;
   needsAfterHeader: boolean;
 }
@@ -579,6 +587,7 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     wrapper,
     container,
     config,
+    diffLines,
     csvDiff,
     owner,
     repo,
@@ -587,24 +596,37 @@ async function fetchAndRerender(params: FetchAndRerenderParams): Promise<void> {
     filepath,
     willFetchBefore,
     willFetchAfter,
+    willFetchBeforeFile,
+    willFetchAfterFile,
     needsBeforeHeader,
     needsAfterHeader,
   } = params;
 
   try {
-    const [beforeHeader, afterHeader] = await Promise.all([
-      willFetchBefore && baseRef
-        ? fetchCsvHeaderRow(owner, repo, baseRef, filepath)
-        : Promise.resolve(null),
-      willFetchAfter && headRef
-        ? fetchCsvHeaderRow(owner, repo, headRef, filepath)
-        : Promise.resolve(null),
-    ]);
+    const [beforeHeader, afterHeader, beforeFile, afterFile] =
+      await Promise.all([
+        willFetchBefore && baseRef
+          ? fetchCsvHeaderRow(owner, repo, baseRef, filepath)
+          : Promise.resolve(null),
+        willFetchAfter && headRef
+          ? fetchCsvHeaderRow(owner, repo, headRef, filepath)
+          : Promise.resolve(null),
+        willFetchBeforeFile && baseRef
+          ? fetchFileText(owner, repo, baseRef, filepath)
+          : Promise.resolve(null),
+        willFetchAfterFile && headRef
+          ? fetchFileText(owner, repo, headRef, filepath)
+          : Promise.resolve(null),
+      ]);
 
     if (!wrapper.isConnected) return;
 
+    const finalDiff =
+      beforeFile != null || afterFile != null
+        ? diffToCsv(diffLines, { before: beforeFile, after: afterFile })
+        : csvDiff;
     const newTable = renderDiffTable(
-      csvDiff,
+      finalDiff,
       buildFinalRenderOptions(
         needsBeforeHeader,
         needsAfterHeader,
