@@ -27,9 +27,16 @@ export function parseCsvWithLineMap(
     return { data: [], lineNumbers: [] };
   }
 
+  const guess = Papa.parse<string[]>(normalizeLines(lines).join("\n"), {
+    ...parseOptions,
+    preview: 1,
+  });
+  // Segments get an explicit delimiter, so only this parse can report that
+  // Papa failed to detect one.
+  const errors = guess.errors.filter((error) => error.type === "Delimiter");
+
   const data: string[][] = [];
   const resultLineNumbers: Array<number | null> = [];
-  const errors: Papa.ParseError[] = [];
 
   function parseSegment(start: number, end: number): void {
     const normalizedLines = normalizeLines(lines.slice(start, end));
@@ -54,6 +61,7 @@ export function parseCsvWithLineMap(
     let prevCursor = 0;
     Papa.parse<string[]>(raw, {
       ...parseOptions,
+      delimiter: guess.meta.delimiter,
       step: (results) => {
         if (results.errors.length > 0) {
           errors.push(...results.errors);

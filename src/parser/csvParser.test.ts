@@ -100,6 +100,31 @@ describe("parseCsvWithLineMap", () => {
     });
   });
 
+  it("guesses the delimiter on the whole input, not per segment", () => {
+    const result = parseCsvWithLineMap(
+      ["id,note", "1,ok", "2,a;b;c"],
+      [1, 2, 20],
+    );
+    expect(result).toEqual({
+      data: [
+        ["id", "note"],
+        ["1", "ok"],
+        ["2", "a;b;c"],
+      ],
+      lineNumbers: [1, 2, 20],
+    });
+  });
+
+  it("still warns when no delimiter can be detected", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    parseCsvWithLineMap(["plain", "text"], [1, 2]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls[0])).toContain(
+      "UndetectableDelimiter",
+    );
+    warn.mockRestore();
+  });
+
   it("warns about an unterminated quote and still returns the parsed rows", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = parseCsvWithLineMap(['a,"b', "c,d"], [1, 2]);
