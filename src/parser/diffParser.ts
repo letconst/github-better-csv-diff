@@ -38,6 +38,9 @@ export interface CsvDiff {
   after: string[][];
   beforeLineNumbers: Array<number | null>;
   afterLineNumbers: Array<number | null>;
+  /** True for rows that are a fragment of a record cut by a collapsed region. */
+  beforeCut: boolean[];
+  afterCut: boolean[];
   /** Diff-order alignment for rendering. One entry per diff text line. */
   alignment: DiffAlignment[];
 }
@@ -72,7 +75,10 @@ export function getFirstLineNumbers(lines: DiffLine[]): {
   return { firstBeforeLine, firstAfterLine };
 }
 
-export function diffToCsv(lines: DiffLine[]): CsvDiff {
+export function diffToCsv(
+  lines: DiffLine[],
+  files?: { before?: string | null; after?: string | null },
+): CsvDiff {
   const beforeLines: string[] = [];
   const afterLines: string[] = [];
   const beforeLineNumbers: Array<number | null> = [];
@@ -90,14 +96,20 @@ export function diffToCsv(lines: DiffLine[]): CsvDiff {
     }
   }
 
-  const before = parseCsvWithLineMap(beforeLines, beforeLineNumbers);
-  const after = parseCsvWithLineMap(afterLines, afterLineNumbers);
+  const before = parseCsvWithLineMap(
+    beforeLines,
+    beforeLineNumbers,
+    files?.before,
+  );
+  const after = parseCsvWithLineMap(afterLines, afterLineNumbers, files?.after);
 
   return {
     before: before.data,
     after: after.data,
     beforeLineNumbers: before.lineNumbers,
     afterLineNumbers: after.lineNumbers,
+    beforeCut: before.cut,
+    afterCut: after.cut,
     alignment: lines.map(
       (line): DiffAlignment =>
         line.type === "hunk"
