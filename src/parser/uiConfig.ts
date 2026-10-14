@@ -20,6 +20,9 @@ export interface UiConfig {
    * directly below it, so its rendered height drives the sticky-top offset.
    */
   stickyFileHeaderSelector: string;
+  /** Selector for GitHub's native expand controls inside a hunk row. */
+  expanderSelector: string;
+  expanderDirection(el: HTMLElement): "up" | "down" | "all";
   extractContent(cell: HTMLTableCellElement): string;
   /** Extract text from a changed (added/removed) content cell, stripping diff marker if present. */
   extractChangedContent(cell: HTMLTableCellElement): string;
@@ -37,6 +40,11 @@ export const PREVIEW_UI: UiConfig = {
   contentSelector: ":scope > :nth-child(2)",
   actionsSelector: ':has(> [class*="MarkAsViewedButton"])',
   stickyFileHeaderSelector: 'div[class*="diffHeaderWrapper"]',
+  expanderSelector: "button[data-direction]",
+  expanderDirection: (el) => {
+    const d = el.dataset.direction;
+    return d === "up" || d === "down" ? d : "all";
+  },
   extractContent: (cell) => cell.textContent ?? "",
   extractChangedContent: (cell) => {
     const text = cell.textContent ?? "";
@@ -50,6 +58,14 @@ export const PREVIEW_UI: UiConfig = {
   },
 };
 
+// GitHub's expanded-context rows put .blob-code-inner on the <td> itself;
+// ordinary diff rows wrap the text in a child span.
+const classicCodeText = (cell: HTMLTableCellElement): string =>
+  (cell.matches(".blob-code-inner")
+    ? cell
+    : cell.querySelector<HTMLElement>(".blob-code-inner")
+  )?.textContent ?? "";
+
 export const CLASSIC_UI: UiConfig = {
   tableSelector: "table.diff-table",
   rowSelector: "tbody tr",
@@ -60,10 +76,16 @@ export const CLASSIC_UI: UiConfig = {
   contentSelector: ".js-file-content",
   actionsSelector: ".file-actions > .d-flex",
   stickyFileHeaderSelector: ".file-header",
-  extractContent: (cell) =>
-    cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
-  extractChangedContent: (cell) =>
-    cell.querySelector<HTMLElement>(".blob-code-inner")?.textContent ?? "",
+  expanderSelector: "a.js-expand",
+  expanderDirection: (el) => {
+    const byLabel: Record<string, "up" | "down"> = {
+      "Expand Up": "up",
+      "Expand Down": "down",
+    };
+    return byLabel[el.getAttribute("aria-label") ?? ""] ?? "all";
+  },
+  extractContent: classicCodeText,
+  extractChangedContent: classicCodeText,
   extractLineNumber: (cell) => {
     const attr = cell.getAttribute("data-line-number");
     if (attr == null) return null;

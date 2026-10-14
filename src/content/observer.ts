@@ -34,6 +34,18 @@ let observer: MutationObserver | null = null;
 let debouncedCallback: CancellableCallback | null = null;
 let lifecycleInitialized = false;
 
+// Preview UI replaces the whole region node when a native expand button is
+// clicked, dropping the container attribute, so the Raw Diff choice is kept here.
+const rawChoices = new Map<string, boolean>();
+
+// A re-added node carrying one of these ids is a GitHub re-render of a file we
+// already replaced; it must be processed before paint, not after the debounce.
+const processedContainerIds = new Set<string>();
+
+function rawChoiceKey(filename: string): string {
+  return `${location.pathname}\n${filename}`;
+}
+
 export function initObserverLifecycle(): void {
   if (lifecycleInitialized) return;
   lifecycleInitialized = true;
@@ -89,13 +101,37 @@ function syncObserverWithRoute(): void {
 
 function connectObserver(): void {
   if (observer || !document.body) return;
-  debouncedCallback = debounce(processExistingDiffs, 300);
-  observer = new MutationObserver(debouncedCallback);
+  const debounced = debounce(processExistingDiffs, 300);
+  debouncedCallback = debounced;
+  observer = new MutationObserver((mutations, obs) => {
+    if (!addsProcessedContainer(mutations)) {
+      debounced(mutations, obs);
+      return;
+    }
+    debounced.cancel();
+    processExistingDiffs();
+  });
   observer.observe(document.body, { childList: true, subtree: true });
   console.debug(
     "[GitHub Better CSV Diff] Observer connected",
     location.pathname,
   );
+}
+
+function addsProcessedContainer(mutations: MutationRecord[]): boolean {
+  if (processedContainerIds.size === 0) return false;
+  for (const mutation of mutations) {
+    for (const node of mutation.addedNodes) {
+      if (!(node instanceof Element)) continue;
+      if (processedContainerIds.has(node.id)) return true;
+      for (const el of node.querySelectorAll<HTMLElement>(
+        'div[role="region"][id], div.file.js-file[id]',
+      )) {
+        if (processedContainerIds.has(el.id)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function disconnectObserver(): void {
@@ -105,6 +141,8 @@ function disconnectObserver(): void {
   // Clear cached revision context and header cache on navigation
   clearRevisionContextCache();
   clearHeaderCache();
+  rawChoices.clear();
+  processedContainerIds.clear();
   // Disconnect per-table ResizeObservers and cancel pending rAFs so they don't
   // leak across navigations / Turbo snapshot caching.
   teardownAllContainerStates();
@@ -291,6 +329,11 @@ function handleViewportScroll(): void {
 }
 
 function processExistingDiffs(): void {
+  // Preview UI replaces the whole region on context expansion, detaching the old container without any event.
+  for (const container of [...containerStates.keys()]) {
+    if (!container.isConnected) teardownContainerState(container);
+  }
+
   // Preview UI containers (PR + commit pages).
   // Use a broad selector so collapsed files (no table in DOM) are still found.
   // Non-diff regions are filtered out by the filename/CSV check below.
@@ -305,15 +348,23 @@ function processExistingDiffs(): void {
     if (container.hasAttribute(PROCESSED_ATTR)) {
       const wrapper = container.querySelector<HTMLElement>(".csv-diff-wrapper");
       if (wrapper) {
-        // Wrapper present AND observer state live — fully processed, skip.
-        if (containerStates.has(container)) continue;
+        const state = containerStates.get(container);
+        // Wrapper present AND observer state live AND native table unchanged
+        // (PROCESSED_ATTR holds the row count at extraction) — fully processed, skip.
+        if (
+          state &&
+          container.getAttribute(PROCESSED_ATTR) ===
+            String(countNativeRows(container, state.config))
+        ) {
+          continue;
+        }
 
-        // Wrapper present but state gone: a Turbo snapshot / bfcache restore
+        // Otherwise the wrapper is stale: a Turbo snapshot / bfcache restore
         // brought back the markup with all JS-attached listeners + observers
-        // stripped (disconnectObserver ran on before-cache). Drop the stale
-        // wrapper and fall through to a full re-init, which re-renders +
-        // re-injects and thereby re-attaches scroll/toggle listeners and
-        // re-registers observers.
+        // stripped (disconnectObserver ran on before-cache), or Classic UI
+        // inserted expanded rows into the native table. Drop the wrapper and
+        // fall through to a full re-init, which re-renders + re-injects and
+        // thereby re-attaches scroll/toggle listeners and re-registers observers.
         //
         // First un-hide the original diff children: injectTableOverlay hid them
         // with inline display:none, which the snapshot preserved. Restoring them
@@ -378,6 +429,13 @@ function getFilenameFromH3(container: HTMLElement): string | null {
   );
 }
 
+function countNativeRows(container: HTMLElement, config: UiConfig): number {
+  return (
+    container.querySelector<HTMLTableElement>(config.tableSelector)?.rows
+      .length ?? 0
+  );
+}
+
 function processCsvDiffBlock(
   container: HTMLElement,
   config: UiConfig,
@@ -385,6 +443,7 @@ function processCsvDiffBlock(
 ): void {
   try {
     const diffLines = extractDiffLinesFromDom(container, config);
+    const nativeRowCount = countNativeRows(container, config);
     if (diffLines.length === 0) {
       console.warn(
         "[GitHub Better CSV Diff] No diff lines extracted from",
@@ -402,8 +461,8 @@ function processCsvDiffBlock(
     if (!needsBeforeHeader && !needsAfterHeader) {
       // No header fetch needed — render as before
       const tableElement = renderDiffTable(csvDiff);
-      if (injectTableOverlay(container, tableElement, config)) {
-        container.setAttribute(PROCESSED_ATTR, "true");
+      if (injectTableOverlay(container, tableElement, config, filename)) {
+        container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
       }
       return;
     }
@@ -420,8 +479,8 @@ function processCsvDiffBlock(
       willFetchAfter,
     );
     const tableElement = renderDiffTable(csvDiff, options);
-    if (!injectTableOverlay(container, tableElement, config)) return;
-    container.setAttribute(PROCESSED_ATTR, "true");
+    if (!injectTableOverlay(container, tableElement, config, filename)) return;
+    container.setAttribute(PROCESSED_ATTR, String(nativeRowCount));
 
     if (!willFetchBefore && !willFetchAfter) {
       return;
@@ -698,6 +757,7 @@ function injectTableOverlay(
   container: HTMLElement,
   tableElement: HTMLElement,
   config: UiConfig,
+  filename: string,
 ): boolean {
   const header = container.querySelector<HTMLElement>(config.headerSelector);
   const diffBody = container.querySelector<HTMLElement>(config.contentSelector);
@@ -709,7 +769,11 @@ function injectTableOverlay(
     return false;
   }
 
-  const raw = container.hasAttribute("data-csv-diff-raw");
+  const choiceKey = rawChoiceKey(filename);
+  const raw =
+    container.hasAttribute("data-csv-diff-raw") ||
+    rawChoices.get(choiceKey) === true;
+  container.toggleAttribute("data-csv-diff-raw", raw);
   const wrapper = document.createElement("div");
   wrapper.className = "csv-diff-wrapper";
   wrapper.style.display = raw ? "none" : "";
@@ -733,6 +797,7 @@ function injectTableOverlay(
     setToggleRaw(toggleBtn, isTableVisible);
     // Toggle raw-mode attribute so CSS stops hiding original content
     container.toggleAttribute("data-csv-diff-raw", isTableVisible);
+    rawChoices.set(choiceKey, isTableVisible);
     // Re-sync sticky offset + column widths + row heights when toggling back to
     // table view (all read 0 while the wrapper was display:none).
     if (!isTableVisible) {
@@ -747,6 +812,7 @@ function injectTableOverlay(
   setOriginalChildrenVisible(raw);
   diffBody.prepend(wrapper);
   setupTableObservers(tableElement, container, wrapper, config);
+  if (container.id) processedContainerIds.add(container.id);
   return true;
 }
 

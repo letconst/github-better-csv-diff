@@ -31,7 +31,8 @@ R029,Toulouse,France,498000,118,Europe/Paris,1190
 R030,Nice,France,347000,71,Europe/Paris,350
 R031,Berlin,Germany,3645000,891,Europe/Berlin,1237
 R032,Hamburg,Germany,1841000,755,Europe/Berlin,808
-R033,Munich,Germany,1472000,310,Europe/Berlin,1158
+R033,"Munich
+Bavaria",Germany,1472000,310,Europe/Berlin,1158
 R034,Cologne,Germany,1086000,405,Europe/Berlin,50
 R035,Frankfurt,Germany,753000,248,Europe/Berlin,794
 R036,Sydney,Australia,5312000,12367,Australia/Sydney,1788

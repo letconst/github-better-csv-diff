@@ -13,6 +13,12 @@ its markup, refresh these and review the test expectations separately.
 | `classic-pr-split.html` | `/letconst/github-better-csv-diff/pull/2/files?diff=split`, `div.file.js-file[data-tagsearch-path="example/sample.csv"]` | Classic UI, split | 2026-10-10 |
 | `classic-pr-unified.html` | same PR, `?diff=unified` | Classic UI, unified | 2026-10-10 |
 | `classic-pr-split-large-file.html` | same PR, `?diff=split`, `div.file.js-file[data-tagsearch-path="example/large-file.csv"]` (diff starts at line 24) | Classic UI, split | 2026-10-10 |
+| `preview-pr-split-large-file.html` | `/letconst/github-better-csv-diff/pull/2/changes?diff=split&new_files_changed=true`, `div[id^="diff-"][role="region"]` for `example/large-file.csv` (diff starts at line 24, logged in) | Preview UI, split | 2026-10-13 |
+| `classic-pr-split-large-file-expanded.html` | same PR, `?diff=split`, same container as `classic-pr-split-large-file.html`, captured after clicking "Expand Up" until all context was expanded (`tr.blob-expanded` rows for lines 1-23 and 35-46; file had 46 lines) | Classic UI, split | 2026-10-14 |
+
+Both large-file fixtures predate the 2026-10-13 sample-data change on PR #2:
+the file now has three hunks, while the fixtures show the earlier single-hunk
+state, which the header-fetch tests rely on.
 
 Revisions: PR #2 compares `96e7fb85` (main) to `20765189` (test/csv-diff-demo).
 The commit page shows commit `20765189` (parent `20765189^`).
