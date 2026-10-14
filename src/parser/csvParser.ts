@@ -81,47 +81,54 @@ export function parseCsvWithLineMap(
   }
 
   const normalized = normalizeLines(lines);
-  const joined = normalized.join("\n");
 
-  const guess = Papa.parse<string[]>(joined, { ...parseOptions, preview: 1 });
-  // Segments get an explicit delimiter, so only this parse can report that
-  // Papa failed to detect one.
-  const errors = guess.errors.filter((error) => error.type === "Delimiter");
-
-  const data: string[][] = [];
-  const resultLineNumbers: Array<number | null> = [];
-
-  const parseRange = (start: number, end: number) => {
-    const segment = parseSegment(
-      normalized.slice(start, end),
-      lineNumbers.slice(start, end),
-      guess.meta.delimiter,
-    );
-    data.push(...segment.data);
-    resultLineNumbers.push(...segment.lineNumbers);
-    errors.push(...segment.errors);
-  };
-
+  const ranges: Array<[number, number]> = [];
   let expected: number | null = null;
   let segmentStart = 0;
   for (let i = 0; i < lines.length; i++) {
     const n = lineNumbers[i];
     if (n != null && expected !== null && n !== expected) {
-      parseRange(segmentStart, i);
+      ranges.push([segmentStart, i]);
       segmentStart = i;
     }
     // An unreadable line still occupies one physical line.
     if (n != null) expected = n;
     if (expected !== null) expected++;
   }
-  parseRange(segmentStart, lines.length);
+  ranges.push([segmentStart, lines.length]);
+
+  // An open quote at a segment's end hides every delimiter after it from a
+  // joined guess, so guess per segment and share the first detectable one.
+  const guesses = ranges.map(([start, end]) =>
+    Papa.parse<string[]>(normalized.slice(start, end).join("\n"), {
+      ...parseOptions,
+      preview: 1,
+    }),
+  );
+  const isDetected = (guess: (typeof guesses)[number]) =>
+    !guess.errors.some((error) => error.type === "Delimiter");
+  const chosen = guesses.find(isDetected) ?? guesses[0]!;
+  const errors = chosen.errors.filter((error) => error.type === "Delimiter");
+
+  const data: string[][] = [];
+  const resultLineNumbers: Array<number | null> = [];
+  for (const [start, end] of ranges) {
+    const segment = parseSegment(
+      normalized.slice(start, end),
+      lineNumbers.slice(start, end),
+      chosen.meta.delimiter,
+    );
+    data.push(...segment.data);
+    resultLineNumbers.push(...segment.lineNumbers);
+    errors.push(...segment.errors);
+  }
 
   if (errors.length > 0) {
     console.warn("[GitHub Better CSV Diff] CSV parse errors:", errors);
   }
 
   if (data.length === 0) {
-    const result = Papa.parse<string[]>(joined, parseOptions);
+    const result = Papa.parse<string[]>(normalized.join("\n"), parseOptions);
     return {
       data: result.data,
       lineNumbers: Array(result.data.length).fill(null),

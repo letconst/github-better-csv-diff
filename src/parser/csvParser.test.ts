@@ -100,7 +100,7 @@ describe("parseCsvWithLineMap", () => {
     });
   });
 
-  it("guesses the delimiter on the whole input, not per segment", () => {
+  it("shares one delimiter across segments instead of guessing per segment", () => {
     const result = parseCsvWithLineMap(
       ["id,note", "1,ok", "2,a;b;c"],
       [1, 2, 20],
@@ -113,6 +113,17 @@ describe("parseCsvWithLineMap", () => {
       ],
       lineNumbers: [1, 2, 20],
     });
+  });
+
+  it("takes the delimiter from a later segment when an earlier one ends inside an open quote", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = parseCsvWithLineMap(['"open', "2;ok", "3;x"], [1, 20, 21]);
+    expect(result.data.slice(1)).toEqual([
+      ["2", "ok"],
+      ["3", "x"],
+    ]);
+    expect(result.lineNumbers).toEqual([1, 20, 21]);
+    warn.mockRestore();
   });
 
   it("still warns when no delimiter can be detected", () => {

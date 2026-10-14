@@ -24,8 +24,11 @@ one hunk from bleeding into the next.
   numbered or not; only a numbered line that differs from the counter starts a
   new segment. `10, null, 12` stays one segment.
 - Delimiter: Papa guesses the delimiter per parse call, and a short segment
-  alone can guess wrong (`2,a;b;c` reads as semicolon-separated). Detect once
-  on the joined text of the whole side, as today, and pass it to every segment.
+  alone can guess wrong (`2,a;b;c` reads as semicolon-separated). Guess per
+  segment and share the first detectable guess with every segment. A guess on
+  the joined text fails when a segment ends inside an open quote, because the
+  open field hides every delimiter after it. If no segment is detectable, the
+  first guess's delimiter is used and its Delimiter error is warned once.
 - `MissingQuotes` from a cut fragment is still reported via `console.warn`.
   Truncation cannot be told apart from malformed CSV, so suppressing it would
   hide real errors. Errors from all segments are collected into one warning.
@@ -38,9 +41,10 @@ one hunk from bleeding into the next.
 - `diffParser.test.ts`: #68 spec (the next hunk's rows survive an open quote at
   the previous hunk's end) and a `characterization:` test pinning the cut
   fragment's shape (mirror of the #55 test).
-- `csvParser.test.ts`: null line numbers do not split a segment; the delimiter
-  guessed on the joined text applies to a segment that would guess differently
-  on its own.
+- `csvParser.test.ts`: null line numbers do not split a segment; one shared
+  delimiter applies to a segment that would guess differently on its own; the
+  delimiter comes from a later segment when an earlier one ends inside an open
+  quote.
 
 ## Sample data
 
