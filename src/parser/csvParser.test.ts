@@ -320,4 +320,23 @@ describe("parseCsvWithLineMap cut records across hunks and delimiters", () => {
     expect(result.cut).toEqual([false, false]);
   });
 
+
+  it("shows a record spanning two hunks once, at the first hunk", () => {
+    const text = ["id,note", '2,"a', "b", "c", 'd"', "3,x"].join("
+");
+    const result = parseCsvWithLineMap(
+      ['2,"a', 'd"', "3,x"],
+      [2, 5, 6],
+      text,
+    );
+    expect(result.data).toEqual([
+      ["2", "a
+b
+c
+d"],
+      ["3", "x"],
+    ]);
+    expect(result.lineNumbers).toEqual([2, 6]);
+    expect(result.cut).toEqual([false, false]);
+  });
 });

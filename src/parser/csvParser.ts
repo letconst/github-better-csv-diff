@@ -178,6 +178,7 @@ export function parseCsvWithLineMap(
   }
 
   let mismatched = false;
+  const emitted = new Set<number>();
   const reconstruct = (
     segmentLines: string[],
     segmentNumbers: Array<number | null>,
@@ -193,10 +194,13 @@ export function parseCsvWithLineMap(
     }
     const first = numbered[0]!;
     const last = numbered[numbered.length - 1]!;
-    const hits = fileRecords.filter(
+    const touched = fileRecords.filter(
       (record) => record.endLine >= first && record.startLine <= last,
     );
-    if (hits.length === 0) return null;
+    if (touched.length === 0) return null;
+    // A record spanning several hunks is shown once, at its first hunk.
+    const hits = touched.filter((record) => !emitted.has(record.startLine));
+    for (const record of hits) emitted.add(record.startLine);
     return {
       data: hits.map((record) => record.row),
       lineNumbers: hits.map((record) => Math.max(record.startLine, first)),
