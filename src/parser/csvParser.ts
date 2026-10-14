@@ -154,12 +154,16 @@ export function parseCsvWithLineMap(
 
   // An open quote at a segment's end hides every delimiter after it from a
   // joined guess, so guess per segment and share the first detectable one.
+  const fileLines =
+    fileText == null ? null : normalizeLines(fileText.split("\n"));
+  const guessDelimiter = (text: string) =>
+    Papa.parse<string[]>(text, { ...parseOptions, preview: 1 });
   const guesses = ranges.map(([start, end]) =>
-    Papa.parse<string[]>(normalized.slice(start, end).join("\n"), {
-      ...parseOptions,
-      preview: 1,
-    }),
+    guessDelimiter(normalized.slice(start, end).join("\n")),
   );
+  // Every visible segment may start or end inside a quoted field; the fetched
+  // file is the last resort for the delimiter.
+  if (fileLines !== null) guesses.push(guessDelimiter(fileLines.join("\n")));
   const isDetected = (guess: (typeof guesses)[number]) =>
     !guess.errors.some((error) => error.type === "Delimiter");
   const chosen = guesses.find(isDetected) ?? guesses[0]!;
@@ -167,9 +171,7 @@ export function parseCsvWithLineMap(
   const errors = chosen.errors.filter((error) => error.type === "Delimiter");
 
   let fileRecords: FileRecord[] = [];
-  let fileLines: string[] = [];
-  if (fileText != null) {
-    fileLines = normalizeLines(fileText.split("\n"));
+  if (fileLines !== null) {
     const parsed = parseFileRecords(fileLines, delimiter);
     fileRecords = parsed.records;
     errors.push(...parsed.errors);
@@ -181,7 +183,7 @@ export function parseCsvWithLineMap(
     segmentNumbers: Array<number | null>,
   ): ReturnType<typeof parseSegment> | null => {
     const numbered = segmentNumbers.filter((n): n is number => n != null);
-    if (fileText == null || numbered.length === 0) return null;
+    if (fileLines === null || numbered.length === 0) return null;
     const matches = segmentNumbers.every(
       (n, i) => n == null || fileLines[n - 1] === segmentLines[i],
     );

@@ -307,3 +307,17 @@ describe("parseCsvWithLineMap cut records", () => {
     ]);
   });
 });
+
+describe("parseCsvWithLineMap cut records across hunks and delimiters", () => {
+  it("takes the delimiter from the fetched file when no visible segment can detect it", () => {
+    const text = ["id\tnote", '2\t"first', 'second"', "3\tx"].join("\n");
+    const result = parseCsvWithLineMap(['second"', "3\tx"], [3, 4], text);
+    expect(result.data).toEqual([
+      ["2", "first\nsecond"],
+      ["3", "x"],
+    ]);
+    expect(result.lineNumbers).toEqual([3, 4]);
+    expect(result.cut).toEqual([false, false]);
+  });
+
+});
