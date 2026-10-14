@@ -93,11 +93,23 @@ function buildRowTokens(
         entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;
       const ai =
         entry.newLineNumber != null ? aMap.get(entry.newLineNumber) : undefined;
-      if (bi === undefined || ai === undefined) continue;
-      if (consumedB.has(bi) || consumedA.has(ai)) continue;
-      consumedB.add(bi);
-      consumedA.add(ai);
-      tokens.push({ type: "unchanged", beforeIndex: bi, afterIndex: ai });
+      if (bi === undefined && ai === undefined) continue;
+      if (bi !== undefined && consumedB.has(bi)) continue;
+      if (ai !== undefined && consumedA.has(ai)) continue;
+      if (bi !== undefined) consumedB.add(bi);
+      if (ai !== undefined) consumedA.add(ai);
+      // One side resolves only when the other side's record was rebuilt from a
+      // fetched file; keep the entry so the alignment result stays complete.
+      tokens.push({
+        type:
+          bi === undefined
+            ? "added"
+            : ai === undefined
+              ? "removed"
+              : "unchanged",
+        beforeIndex: bi ?? null,
+        afterIndex: ai ?? null,
+      });
     } else if (entry.type === "removed") {
       const bi =
         entry.oldLineNumber != null ? bMap.get(entry.oldLineNumber) : undefined;

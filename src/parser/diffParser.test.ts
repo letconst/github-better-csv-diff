@@ -141,11 +141,24 @@ describe("diffToCsv", () => {
     expect(result.alignment).toHaveLength(4);
   });
 
-  it("characterization: a hunk starting inside a quoted record renders the fragment as its own rows", () => {
-    // #55
+  it("returns a hunk starting inside a quoted record as flagged fragment rows when no file is given (#55)", () => {
     const result = diffToCsv([added('line two"', 12), added("2,x", 13)]);
     expect(result.after).toEqual([['line two"'], ["2", "x"]]);
     expect(result.afterLineNumbers).toEqual([12, 13]);
+    expect(result.afterCut).toEqual([true, true]);
+  });
+
+  it("replaces a hunk starting inside a quoted record with the complete record when the file is given (#55)", () => {
+    const after = ["id,note", '1,"one', 'line two"', "2,x"].join("\n");
+    const result = diffToCsv([added('line two"', 3), added("2,x", 4)], {
+      after,
+    });
+    expect(result.after).toEqual([
+      ["1", "one\nline two"],
+      ["2", "x"],
+    ]);
+    expect(result.afterLineNumbers).toEqual([3, 4]);
+    expect(result.afterCut).toEqual([false, false]);
   });
 
   it("parses each hunk as its own segment so an open quote at a hunk end does not swallow the next hunk", () => {
@@ -162,8 +175,7 @@ describe("diffToCsv", () => {
     expect(result.afterLineNumbers.at(-1)).toBe(30);
   });
 
-  it("characterization: a hunk ending inside a quoted record renders the cut fragment as its own rows", () => {
-    // #68, mirror of #55
+  it("returns a hunk ending inside a quoted record as flagged fragment rows when no file is given (#68)", () => {
     const result = diffToCsv([
       removed('1,"old', 10),
       added('1,"new', 10),
@@ -183,6 +195,35 @@ describe("diffToCsv", () => {
     ]);
     expect(result.beforeLineNumbers).toEqual([10, 30, 31]);
     expect(result.afterLineNumbers).toEqual([10, 30, 31]);
+    expect(result.beforeCut).toEqual([true, true, true]);
+    expect(result.afterCut).toEqual([true, true, true]);
+  });
+
+  it("replaces a hunk ending inside a quoted record with the complete record when the file is given (#68)", () => {
+    const before = [
+      ...Array(9).fill("x,y"),
+      '1,"old',
+      "visible",
+      'more"',
+      "2,ok",
+    ].join("\n");
+    const after = [
+      ...Array(9).fill("x,y"),
+      '1,"new',
+      "visible",
+      'more"',
+      "2,ok",
+    ].join("\n");
+    const result = diffToCsv(
+      [removed('1,"old', 10), added('1,"new', 10), unchanged("visible", 11)],
+      { before, after },
+    );
+    expect(result.before).toEqual([["1", "old\nvisible\nmore"]]);
+    expect(result.after).toEqual([["1", "new\nvisible\nmore"]]);
+    expect(result.beforeLineNumbers).toEqual([10]);
+    expect(result.afterLineNumbers).toEqual([10]);
+    expect(result.beforeCut).toEqual([false]);
+    expect(result.afterCut).toEqual([false]);
   });
 });
 

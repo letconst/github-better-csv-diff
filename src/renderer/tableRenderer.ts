@@ -32,6 +32,8 @@ export interface SideHeaderMode {
 export interface RenderOptions {
   before?: SideHeaderMode;
   after?: SideHeaderMode;
+  /** Sides whose cut rows render as a loading cell until their file arrives. */
+  loading?: { before?: boolean; after?: boolean };
 }
 
 /**
@@ -165,7 +167,7 @@ export function syncColumnWidths(container: HTMLElement): void {
     const hasSpanningHeaderCell = headerCells.some((cell) => cell.colSpan > 1);
     const bodyCells =
       bodyTable.querySelector<HTMLTableRowElement>(
-        "tbody tr:not(.csv-diff-row-gap)",
+        "tbody tr:not(.csv-diff-row-gap):not(.csv-diff-row-loading)",
       )?.children ?? null;
     const widths = new Array<number>(n);
     for (let c = 0; c < n; c++) {
@@ -225,14 +227,39 @@ export function renderDiffTable(
   const container = document.createElement("div");
   container.className = "csv-diff-container";
 
-  const before = resolveHeaderAndData(
+  const loadingRows = new Set<string[]>();
+  const resolveSide = (
+    rows: string[][],
+    lineNumbers: Array<number | null>,
+    cut: boolean[],
+    loading: boolean,
+    mode?: SideHeaderMode,
+  ) => {
+    if (loading) {
+      for (let i = 0; i < rows.length; i++) {
+        if (cut[i]) loadingRows.add(rows[i]!);
+      }
+    }
+    const loadingHeader =
+      loading && cut[0] && (!mode || mode.mode === "default");
+    return resolveHeaderAndData(
+      rows,
+      lineNumbers,
+      loadingHeader ? { mode: "loading" } : mode,
+    );
+  };
+  const before = resolveSide(
     diff.before,
     diff.beforeLineNumbers,
+    diff.beforeCut,
+    options?.loading?.before ?? false,
     options?.before,
   );
-  const after = resolveHeaderAndData(
+  const after = resolveSide(
     diff.after,
     diff.afterLineNumbers,
+    diff.afterCut,
+    options?.loading?.after ?? false,
     options?.after,
   );
 
@@ -261,6 +288,7 @@ export function renderDiffTable(
       maxCols,
       gapButtons,
       before.isLoading,
+      loadingRows,
     ),
   );
   container.appendChild(
@@ -272,6 +300,7 @@ export function renderDiffTable(
       maxCols,
       gapButtons,
       after.isLoading,
+      loadingRows,
     ),
   );
 
@@ -360,7 +389,8 @@ function buildSide(
   side: "before" | "after",
   maxCols: number,
   gapButtons: Map<number, HTMLButtonElement[]>,
-  isLoading = false,
+  isLoading: boolean,
+  loadingRows: Set<string[]>,
 ): HTMLElement {
   const sideDiv = document.createElement("div");
   sideDiv.className = "csv-diff-side";
@@ -374,7 +404,9 @@ function buildSide(
   // body's horizontal scroll container and stick to the viewport. Their column
   // widths are aligned at runtime by syncColumnWidths.
   sideDiv.appendChild(buildHeaderTable(headers, maxCols, isLoading));
-  sideDiv.appendChild(buildBodyTable(matched, side, maxCols, gapButtons));
+  sideDiv.appendChild(
+    buildBodyTable(matched, side, maxCols, gapButtons, loadingRows),
+  );
   return sideDiv;
 }
 
@@ -436,6 +468,7 @@ function buildBodyTable(
   side: "before" | "after",
   maxCols: number,
   gapButtons: Map<number, HTMLButtonElement[]>,
+  loadingRows: Set<string[]>,
 ): HTMLElement {
   const bodyDiv = document.createElement("div");
   bodyDiv.className = "csv-diff-body";
@@ -470,6 +503,17 @@ function buildBodyTable(
       side === "before" ? match.beforeLineNumber : match.afterLineNumber;
     const tr = document.createElement("tr");
     const isEmpty = row === null;
+
+    if (row !== null && loadingRows.has(row)) {
+      tr.className = "csv-diff-row-loading";
+      const td = document.createElement("td");
+      td.colSpan = colCount;
+      td.className = "csv-diff-loading";
+      td.textContent = "Loading...";
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
 
     if (isEmpty) {
       tr.className = "csv-diff-row-empty";
@@ -521,6 +565,12 @@ function highlightChangedCells(
     const beforeTr = beforeRows[i];
     const afterTr = afterRows[i];
     if (!beforeTr || !afterTr) continue;
+    if (
+      beforeTr.classList.contains("csv-diff-row-loading") ||
+      afterTr.classList.contains("csv-diff-row-loading")
+    ) {
+      continue;
+    }
 
     // Style line number cells for modified rows
     const beforeLineNum = beforeTr.children[0] as HTMLElement | undefined;

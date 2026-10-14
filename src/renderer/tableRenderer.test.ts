@@ -33,8 +33,17 @@ function csvDiff(
   beforeLineNumbers: Array<number | null>,
   afterLineNumbers: Array<number | null>,
   alignment: DiffAlignment[] = [],
+  cut: { before?: boolean[]; after?: boolean[] } = {},
 ): CsvDiff {
-  return { before, after, beforeLineNumbers, afterLineNumbers, alignment };
+  return {
+    before,
+    after,
+    beforeLineNumbers,
+    afterLineNumbers,
+    beforeCut: cut.before ?? before.map(() => false),
+    afterCut: cut.after ?? after.map(() => false),
+    alignment,
+  };
 }
 
 const unchangedDiff = (before: string[][], after: string[][]): CsvDiff => {
@@ -821,5 +830,80 @@ describe("renderDiffTable: expand gap rows", () => {
       false,
       true,
     ]);
+  });
+});
+
+describe("renderDiffTable: cut records", () => {
+  const header = ["id", "note"];
+  const cutDiff = () =>
+    csvDiff(
+      [header, ['tail"'], ["2", "ok"]],
+      [header, ['tail"'], ["2", "ok"]],
+      [1, 5, 6],
+      [1, 5, 6],
+      [same(1, 1), same(5, 5), same(6, 6)],
+      { before: [false, true, true], after: [false, true, true] },
+    );
+  const loadingCells = (el: HTMLElement, i: 0 | 1) => [
+    ...sides(el)[i]!.querySelectorAll<HTMLTableCellElement>(
+      ".csv-diff-body-table td.csv-diff-loading",
+    ),
+  ];
+
+  it("renders cut rows on a loading side as one spanning Loading... cell and other rows normally", () => {
+    const el = renderDiffTable(
+      csvDiff(
+        [header, ["1", "ok"], ['tail"']],
+        [header, ["1", "ok"], ['tail"']],
+        [1, 2, 5],
+        [1, 2, 5],
+        [same(1, 1), same(2, 2), same(5, 5)],
+        { before: [false, false, true], after: [false, false, true] },
+      ),
+      { loading: { after: true } },
+    );
+    expect(bodyRows(el, 1)).toHaveLength(2);
+    const cells = loadingCells(el, 1);
+    expect(cells).toHaveLength(1);
+    expect(cells[0]!.textContent).toBe("Loading...");
+    expect(cells[0]!.colSpan).toBe(3);
+    expect(bodyRows(el, 1)[0]!.children).toHaveLength(3);
+    expect(loadingCells(el, 0)).toHaveLength(0);
+    expect(bodyRows(el, 0).map(values)).toContainEqual(['tail"', ""]);
+  });
+
+  it("renders the fragment text for a cut side without loading", () => {
+    const el = renderDiffTable(cutDiff());
+    expect(el.querySelectorAll("td.csv-diff-loading")).toHaveLength(0);
+    expect(bodyRows(el, 0).map(values)).toContainEqual(['tail"', ""]);
+  });
+
+  it("puts the header in loading mode when the promoted first row is cut", () => {
+    const diff = csvDiff(
+      [['tail"'], ["2", "ok"]],
+      [['tail"'], ["2", "ok"]],
+      [5, 6],
+      [5, 6],
+      [same(5, 5), same(6, 6)],
+      { before: [true, true], after: [true, true] },
+    );
+    const el = renderDiffTable(diff, { loading: { after: true } });
+    expect(headerTexts(el, 1)).toEqual(["Loading..."]);
+    expect(headerTexts(el, 0)).toEqual(["#", 'tail"', ""]);
+  });
+
+  it("adds no inline diff spans next to a loading cell", () => {
+    const diff = csvDiff(
+      [header, ["1", "hello brave world"]],
+      [header, ["1", "hello brave there"]],
+      [1, 5],
+      [1, 5],
+      [same(1, 1), gone(5), came(5)],
+      { before: [false, false], after: [false, true] },
+    );
+    const el = renderDiffTable(diff, { loading: { after: true } });
+    expect(el.querySelectorAll(".csv-diff-inline-added")).toHaveLength(0);
+    expect(el.querySelectorAll(".csv-diff-inline-removed")).toHaveLength(0);
+    expect(loadingCells(el, 1)).toHaveLength(1);
   });
 });

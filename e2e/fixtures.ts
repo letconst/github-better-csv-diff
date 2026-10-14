@@ -25,8 +25,14 @@ interface RawResponse {
 
 export interface Site {
   pages: Map<string, string>;
+  /** Responses to Range requests (the header fetch), by raw path. */
   raw: Map<string, RawResponse>;
+  /** Responses to plain requests (the full-file fetch), by raw path. */
+  file: Map<string, RawResponse>;
+  /** Raw paths requested with a Range header. */
   rawRequests: string[];
+  /** Raw paths requested without a Range header. */
+  fileRequests: string[];
 }
 
 export function hold(): { release: () => void; promise: Promise<void> } {
@@ -98,7 +104,13 @@ export const test = base.extend<{ context: BrowserContext; site: Site }>({
   },
 
   site: async ({ context }, use) => {
-    const site: Site = { pages: new Map(), raw: new Map(), rawRequests: [] };
+    const site: Site = {
+      pages: new Map(),
+      raw: new Map(),
+      file: new Map(),
+      rawRequests: [],
+      fileRequests: [],
+    };
 
     await context.route("**/*", async (route) => {
       const url = new URL(route.request().url());
@@ -106,8 +118,9 @@ export const test = base.extend<{ context: BrowserContext; site: Site }>({
       if (url.origin !== "https://github.com") return route.abort();
 
       if (rawPathPattern.test(url.pathname)) {
-        site.rawRequests.push(url.pathname);
-        const response = site.raw.get(url.pathname);
+        const ranged = "range" in route.request().headers();
+        (ranged ? site.rawRequests : site.fileRequests).push(url.pathname);
+        const response = (ranged ? site.raw : site.file).get(url.pathname);
         if (!response) return route.abort();
         await response.release;
         return route.fulfill({

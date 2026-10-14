@@ -8,6 +8,7 @@
  */
 
 import Papa from "papaparse";
+import { rawFileUrl } from "./rawUrl";
 
 const INITIAL_RANGE = 4096;
 const MAX_RANGE = 65536;
@@ -52,15 +53,7 @@ async function doFetch(
   ref: string,
   filepath: string,
 ): Promise<string[] | null> {
-  // Encode filepath segments (preserving /) for special chars like #, ?, %
-  const encodedPath = filepath
-    .split("/")
-    .map((seg) => encodeURIComponent(seg))
-    .join("/");
-
-  // Use an absolute URL: Firefox content scripts resolve relative URLs against
-  // the extension origin (moz-extension://), not the page, so fetch() throws.
-  const baseUrl = `${location.origin}/${owner}/${repo}/raw/${ref}/${encodedPath}`;
+  const baseUrl = rawFileUrl(owner, repo, ref, filepath);
   let rangeEnd = INITIAL_RANGE;
 
   while (rangeEnd <= MAX_RANGE) {
