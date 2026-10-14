@@ -161,9 +161,11 @@ export function parseCsvWithLineMap(
   const guesses = ranges.map(([start, end]) =>
     guessDelimiter(normalized.slice(start, end).join("\n")),
   );
-  // Every visible segment may start or end inside a quoted field; the fetched
-  // file is the last resort for the delimiter.
-  if (fileLines !== null) guesses.push(guessDelimiter(fileLines.join("\n")));
+  // A cut fragment can hide the delimiter or show a misleading one inside the
+  // quoted text, so the fetched file's guess comes first.
+  if (fileLines !== null) {
+    guesses.unshift(guessDelimiter(fileLines.join("\n")));
+  }
   const isDetected = (guess: (typeof guesses)[number]) =>
     !guess.errors.some((error) => error.type === "Delimiter");
   const chosen = guesses.find(isDetected) ?? guesses[0]!;

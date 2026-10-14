@@ -320,6 +320,17 @@ describe("parseCsvWithLineMap cut records across hunks and delimiters", () => {
     expect(result.cut).toEqual([false, false]);
   });
 
+  it("prefers the fetched file's delimiter over a misleading one inside the cut fragment", () => {
+    const text = ["id\tnote", '2\t"first', 'second,part"', "3\tx"].join("\n");
+    const result = parseCsvWithLineMap(['second,part"', "3\tx"], [3, 4], text);
+    expect(result.data).toEqual([
+      ["2", "first\nsecond,part"],
+      ["3", "x"],
+    ]);
+    expect(result.lineNumbers).toEqual([3, 4]);
+    expect(result.cut).toEqual([false, false]);
+  });
+
   it("shows a record spanning two hunks once, at the first hunk", () => {
     const text = ["id,note", '2,"a', "b", "c", 'd"', "3,x"].join("\n");
     const result = parseCsvWithLineMap(['2,"a', 'd"', "3,x"], [2, 5, 6], text);
