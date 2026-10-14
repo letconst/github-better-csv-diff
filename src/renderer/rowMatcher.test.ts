@@ -92,6 +92,34 @@ describe("matchRows multiline continuation", () => {
   });
 });
 
+describe("matchRows one-sided unchanged entries", () => {
+  const hunk: DiffAlignment = { type: "hunk", expanders: [] };
+
+  it("keeps the alignment result and its gap rows when an unchanged entry resolves to a before row only", () => {
+    const rows = matchRows(
+      [A, B],
+      [B],
+      [2, 3],
+      [3],
+      [same(2, 2), hunk, same(3, 3)],
+    );
+    expect(rows.map((r) => r.type)).toEqual(["removed", "gap", "unchanged"]);
+    expect(rows[0]).toEqual(row("removed", A, null, 2, null));
+  });
+
+  it("emits an unchanged entry that resolves to an after row only as added", () => {
+    const rows = matchRows(
+      [B],
+      [A, B],
+      [3],
+      [2, 3],
+      [same(2, 2), hunk, same(3, 3)],
+    );
+    expect(rows.map((r) => r.type)).toEqual(["added", "gap", "unchanged"]);
+    expect(rows[0]).toEqual(row("added", null, A, null, 2));
+  });
+});
+
 describe("matchRows alignment fallback", () => {
   it("falls back to key matching when alignment leaves rows unconsumed and keys are unique", () => {
     const k1 = ["k1", "1"];
