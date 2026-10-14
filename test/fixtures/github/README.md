@@ -15,6 +15,7 @@ its markup, refresh these and review the test expectations separately.
 | `classic-pr-split-large-file.html` | same PR, `?diff=split`, `div.file.js-file[data-tagsearch-path="example/large-file.csv"]` (diff starts at line 24) | Classic UI, split | 2026-10-10 |
 | `preview-pr-split-large-file.html` | `/letconst/github-better-csv-diff/pull/2/changes?diff=split&new_files_changed=true`, `div[id^="diff-"][role="region"]` for `example/large-file.csv` (diff starts at line 24, logged in) | Preview UI, split | 2026-10-13 |
 | `classic-pr-split-large-file-expanded.html` | same PR, `?diff=split`, same container as `classic-pr-split-large-file.html`, captured after clicking "Expand Up" until all context was expanded (`tr.blob-expanded` rows for lines 1-23 and 35-46; file had 46 lines) | Classic UI, split | 2026-10-14 |
+| `classic-pr-split-large-file-cut.html` | same PR, `?diff=split`, same container as `classic-pr-split-large-file.html`, captured after the 2026-10-15 sample change (four hunks; hunk 4 `@@ -95,4 +95,4 @@` starts inside the quoted R090 record, #55; head `944014c7`) | Classic UI, split | 2026-10-15 |
 
 Both large-file fixtures predate the 2026-10-13 sample-data change on PR #2:
 the file now has three hunks, while the fixtures show the earlier single-hunk
