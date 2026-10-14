@@ -86,6 +86,20 @@ describe("parseCsvWithLineMap", () => {
     expect(result.lineNumbers).toEqual([null, 7]);
   });
 
+  it("treats a null line number as one physical line and does not split there", () => {
+    const result = parseCsvWithLineMap(
+      ['1,"a', "b", 'c"', "2,x"],
+      [10, null, 12, 13],
+    );
+    expect(result).toEqual({
+      data: [
+        ["1", "a\nb\nc"],
+        ["2", "x"],
+      ],
+      lineNumbers: [10, 13],
+    });
+  });
+
   it("warns about an unterminated quote and still returns the parsed rows", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = parseCsvWithLineMap(['a,"b', "c,d"], [1, 2]);
