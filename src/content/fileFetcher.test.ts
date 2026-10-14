@@ -74,14 +74,16 @@ describe("fetchFileText", () => {
     expect(console.warn).toHaveBeenCalled();
   });
 
-  it("returns null with a warning when Content-Length exceeds 5 MiB", async () => {
-    fetchMock.mockResolvedValue(
-      new Response("tiny", {
-        headers: { "Content-Length": String(5 * 1024 * 1024 + 1) },
-      }),
-    );
+  it("returns null with a warning when the body exceeds 5 MiB without Content-Length", async () => {
+    fetchMock.mockResolvedValue(new Response("a".repeat(5 * 1024 * 1024 + 1)));
     expect(await fetchFileText("o", "r", "m", "f.csv")).toBeNull();
     expect(console.warn).toHaveBeenCalled();
+  });
+
+  it("returns a body of exactly 5 MiB", async () => {
+    const body = "a".repeat(5 * 1024 * 1024);
+    fetchMock.mockResolvedValue(new Response(body));
+    expect(await fetchFileText("o", "r", "m", "f.csv")).toBe(body);
   });
 
   it("refetches after clearFileCache", async () => {

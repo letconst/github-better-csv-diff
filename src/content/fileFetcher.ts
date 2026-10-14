@@ -61,18 +61,35 @@ async function doFetch(
       return null;
     }
 
-    const length = Number(resp.headers.get("Content-Length"));
-    if (length > MAX_BYTES) {
-      await resp.body?.cancel();
+    const text = await readTextWithinCap(resp);
+    if (text === null) {
       console.warn(
         `[GitHub Better CSV Diff] File too large (>${MAX_BYTES} bytes): ${filepath}`,
       );
-      return null;
     }
-
-    return await resp.text();
+    return text;
   } catch (error) {
     console.warn("[GitHub Better CSV Diff] File fetch error:", filepath, error);
     return null;
   }
+}
+
+async function readTextWithinCap(resp: Response): Promise<string | null> {
+  if (!resp.body) return resp.text();
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
 }
