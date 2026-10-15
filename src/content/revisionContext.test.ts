@@ -22,9 +22,14 @@ function addJson(payload: object): void {
   document.body.append(script);
 }
 
-const prPayload = (key: string) => ({
-  [key]: { comparison: { fullDiff: { baseOid: "b1", headOid: "h1" } } },
-});
+const range = (baseOid: string, headOid: string) => ({ baseOid, headOid });
+
+const prPayload = (
+  key: string,
+  ranges: { selectedRange?: object; fullDiff?: object } = {
+    fullDiff: range("b1", "h1"),
+  },
+) => ({ [key]: { comparison: ranges } });
 
 beforeEach(() => {
   document.body.innerHTML = "";
@@ -64,6 +69,19 @@ describe("getRevisionContext", () => {
         });
       },
     );
+
+    it("prefers selectedRange over fullDiff", () => {
+      addJson(
+        prPayload("pullRequestsChangesRoute", {
+          selectedRange: range("s1", "s2"),
+          fullDiff: range("b1", "h1"),
+        }),
+      );
+      expect(getRevisionContext()).toMatchObject({
+        baseRef: "s1",
+        headRef: "s2",
+      });
+    });
 
     it("returns null refs when no JSON carries them", () => {
       addJson({ other: {} });
@@ -137,16 +155,35 @@ describe("getRevisionContext", () => {
       });
     });
 
-    it("prefers PR JSON over the sha fallback", () => {
-      addJson(prPayload("pullRequestsChangesRoute"));
+    it("reads selectedRange from pullRequestsChangesWithRangeRoute", () => {
+      goTo(`/o/r/pull/1/changes/${SHA}`);
+      addJson(
+        prPayload("pullRequestsChangesWithRangeRoute", {
+          selectedRange: range("s1", "s2"),
+          fullDiff: range("b1", "h1"),
+        }),
+      );
       expect(getRevisionContext()).toMatchObject({
-        baseRef: "b1",
-        headRef: "h1",
+        baseRef: "s1",
+        headRef: "s2",
+      });
+    });
+
+    it("ignores fullDiff and falls back to sha^ when selectedRange is absent", () => {
+      goTo(`/o/r/pull/1/changes/${SHA}`);
+      addJson(prPayload("pullRequestsChangesWithRangeRoute"));
+      expect(getRevisionContext()).toMatchObject({
+        baseRef: `${SHA}^`,
+        headRef: SHA,
       });
     });
 
     it("prefers commit JSON over PR JSON", () => {
-      addJson(prPayload("pullRequestsChangesRoute"));
+      addJson(
+        prPayload("pullRequestsChangesRoute", {
+          selectedRange: range("s1", "s2"),
+        }),
+      );
       addJson({
         commitRoute: { commit: { oid: "c-head", parents: ["c-base"] } },
       });

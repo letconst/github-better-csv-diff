@@ -64,11 +64,15 @@ function resolveRefs(pathname: string): Refs {
 
     case "pr-commit":
       return (
-        extractCommitRefs() ?? extractPreviewPrRefs() ?? refsFromSha(route.sha)
+        extractCommitRefs() ??
+        extractPreviewPrRanges().selectedRange ??
+        refsFromSha(route.sha)
       );
 
-    case "pr-changes":
-      return extractPreviewPrRefs() ?? NO_REFS;
+    case "pr-changes": {
+      const { selectedRange, fullDiff } = extractPreviewPrRanges();
+      return selectedRange ?? fullDiff ?? NO_REFS;
+    }
 
     case "pr-files": {
       // Classic UI: only headRef is reliable (end_commit_oid).
@@ -133,36 +137,38 @@ function extractCommitRefs(): {
   });
 }
 
-function extractPreviewPrRefs(): {
-  baseRef: string | null;
-  headRef: string | null;
-} | null {
-  // Try both route keys: "pullRequestsChangesRoute" is used on fresh page loads,
-  // "pullRequestsChangesWithRangeRoute" is used after SPA navigation from commit pages.
-  const routeKeys = [
-    "pullRequestsChangesRoute",
-    "pullRequestsChangesWithRangeRoute",
-  ] as const;
+// "pullRequestsChangesWithRangeRoute" is also the key on a direct load of /pull/N/changes/<sha>.
+const PREVIEW_PR_ROUTE_KEYS = [
+  "pullRequestsChangesRoute",
+  "pullRequestsChangesWithRangeRoute",
+] as const;
 
-  for (const key of routeKeys) {
-    const refs = extractFromEmbeddedJson(key, (payload) => {
-      const fullDiff = (payload as Record<string, unknown>)[key] as
-        | Record<string, unknown>
-        | undefined;
-      const comparison = fullDiff?.comparison as
-        | Record<string, unknown>
-        | undefined;
-      const diff = comparison?.fullDiff as Record<string, unknown> | undefined;
-      if (!diff) return null;
-      const baseRef = typeof diff.baseOid === "string" ? diff.baseOid : null;
-      const headRef = typeof diff.headOid === "string" ? diff.headOid : null;
-      // Return null if both refs are empty so ?? fallback chains work
-      if (!baseRef && !headRef) return null;
-      return { baseRef, headRef };
+function readRange(range: unknown): Refs | null {
+  if (!range || typeof range !== "object") return null;
+  const { baseOid, headOid } = range as Record<string, unknown>;
+  const baseRef = typeof baseOid === "string" ? baseOid : null;
+  const headRef = typeof headOid === "string" ? headOid : null;
+  // Return null if both refs are empty so ?? fallback chains work
+  if (!baseRef && !headRef) return null;
+  return { baseRef, headRef };
+}
+
+function extractPreviewPrRanges(): {
+  selectedRange: Refs | null;
+  fullDiff: Refs | null;
+} {
+  for (const key of PREVIEW_PR_ROUTE_KEYS) {
+    const ranges = extractFromEmbeddedJson(key, (payload) => {
+      const comparison = (
+        payload[key] as { comparison?: Record<string, unknown> } | undefined
+      )?.comparison;
+      const selectedRange = readRange(comparison?.selectedRange);
+      const fullDiff = readRange(comparison?.fullDiff);
+      return selectedRange || fullDiff ? { selectedRange, fullDiff } : null;
     });
-    if (refs) return refs;
+    if (ranges) return ranges;
   }
-  return null;
+  return { selectedRange: null, fullDiff: null };
 }
 
 /** Resolve refs from a compare spec like "main...feature" (already URL-stripped). */
