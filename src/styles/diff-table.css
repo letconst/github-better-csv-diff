@@ -175,6 +175,10 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  /* fit-content: a full-width flex button would leave nothing to stick within the td */
+  position: sticky;
+  left: 0;
+  width: fit-content;
 }
 
 .csv-diff-expand-btn:hover:not(:disabled) {
