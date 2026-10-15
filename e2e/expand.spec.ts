@@ -287,3 +287,52 @@ test("the Raw Diff choice does not leak to the same file on another diff route",
   );
   await expect(page.locator(".csv-diff-wrapper")).toBeVisible();
 });
+
+test("expand buttons stay at the left edge while the body scrolls horizontally", async ({
+  page,
+  site,
+}) => {
+  await page.setViewportSize({ width: 900, height: 700 });
+  await openLargeFile(page, site);
+
+  const bodies = page.locator(".csv-diff-body");
+  const overflow = await bodies.evaluateAll((els) =>
+    els.map((el) => el.scrollWidth - el.clientWidth),
+  );
+  expect(overflow.every((o) => o > 150)).toBe(true);
+  expect(await page.locator(".csv-diff-expand-btn").count()).toBeGreaterThan(0);
+
+  const buttonLefts = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll(".csv-diff-expand-btn")].map(
+        (el) => el.getBoundingClientRect().left,
+      ),
+    );
+  const before = await buttonLefts();
+
+  const scrollTo = async (left: number) => {
+    await bodies.first().evaluate((el, x) => {
+      el.scrollLeft = x;
+      el.dispatchEvent(new Event("scroll"));
+    }, left);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [
+            ...document.querySelectorAll(
+              ".csv-diff-body, .csv-diff-header-strip",
+            ),
+          ].map((el) => el.scrollLeft),
+        ),
+      )
+      .toEqual([left, left, left, left]);
+    const after = await buttonLefts();
+    expect(after).toHaveLength(before.length);
+    after.forEach((x, i) => {
+      expect(Math.abs(x - before[i]!)).toBeLessThanOrEqual(1);
+    });
+  };
+
+  await scrollTo(150);
+  await scrollTo(Math.floor(Math.min(...overflow)));
+});
