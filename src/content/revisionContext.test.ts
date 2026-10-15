@@ -169,6 +169,20 @@ describe("getRevisionContext", () => {
       });
     });
 
+    it("falls back to sha^ when selectedRange has only one oid", () => {
+      goTo(`/o/r/pull/1/changes/${SHA}`);
+      addJson(
+        prPayload("pullRequestsChangesWithRangeRoute", {
+          selectedRange: { baseOid: "s1" },
+          fullDiff: range("b1", "h1"),
+        }),
+      );
+      expect(getRevisionContext()).toMatchObject({
+        baseRef: `${SHA}^`,
+        headRef: SHA,
+      });
+    });
+
     it("ignores fullDiff and falls back to sha^ when selectedRange is absent", () => {
       goTo(`/o/r/pull/1/changes/${SHA}`);
       addJson(prPayload("pullRequestsChangesWithRangeRoute"));

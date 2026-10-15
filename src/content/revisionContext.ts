@@ -146,11 +146,10 @@ const PREVIEW_PR_ROUTE_KEYS = [
 function readRange(range: unknown): Refs | null {
   if (!range || typeof range !== "object") return null;
   const { baseOid, headOid } = range as Record<string, unknown>;
-  const baseRef = typeof baseOid === "string" ? baseOid : null;
-  const headRef = typeof headOid === "string" ? headOid : null;
-  // Return null if both refs are empty so ?? fallback chains work
-  if (!baseRef && !headRef) return null;
-  return { baseRef, headRef };
+  // A range missing either oid must not shadow the fallbacks behind it
+  if (typeof baseOid !== "string" || typeof headOid !== "string") return null;
+  if (!baseOid || !headOid) return null;
+  return { baseRef: baseOid, headRef: headOid };
 }
 
 function extractPreviewPrRanges(): {
