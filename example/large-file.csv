@@ -24,11 +24,11 @@ R022,Birmingham,UK,1144000,267,Europe/London,1166
 R023,Manchester,UK,553000,115,Europe/London,1301
 R024,Leeds,UK,503000,551,Europe/London,1207
 R025,Glasgow,UK,633000,175,Europe/London,1175
-R026,Paris,France,2161000,105,Europe/Paris,259
-R027,Marseille,France,870000,240,Europe/Paris,600
-R028,Lyon,France,513000,47,Europe/Paris,43
-R029,Toulouse,France,493000,118,Europe/Paris,1190
-R030,Nice,France,344000,71,Europe/Paris,350
+R026,Paris,France,2162000,105,Europe/Paris,259
+R027,Marseille,France,873000,240,Europe/Paris,600
+R028,Lyon,France,516000,47,Europe/Paris,43
+R029,Toulouse,France,498000,118,Europe/Paris,1190
+R030,Nice,France,347000,71,Europe/Paris,350
 R031,Berlin,Germany,3645000,891,Europe/Berlin,1237
 R032,Hamburg,Germany,1841000,755,Europe/Berlin,808
 R033,"Munich
@@ -42,7 +42,7 @@ R039,Perth,Australia,2085000,6417,Australia/Perth,1829
 R040,Adelaide,Australia,1376000,3257,Australia/Adelaide,1836
 R041,Seoul,South Korea,9776000,605,Asia/Seoul,18
 R042,Busan,South Korea,3429000,769,Asia/Seoul,1876
-R043,Toronto,Canada,2794000,630,America/Toronto,1793
+R043,Toronto,Canada,2812000,630,America/Toronto,1793
 R044,Montreal,Canada,1762000,431,America/Montreal,1642
 R045,Vancouver,Canada,662000,115,America/Vancouver,1886
 R046,Calgary,Canada,1306000,825,America/Edmonton,1875
@@ -73,7 +73,7 @@ R070,Brussels,Belgium,185000,32,Europe/Brussels,979
 R071,Vienna,Austria,1897000,415,Europe/Vienna,1221
 R072,Zurich,Switzerland,415000,88,Europe/Zurich,1262
 R073,Geneva,Switzerland,203000,16,Europe/Zurich,1526
-R074,Stockholm,Sweden,975000,188,Europe/Stockholm,1252
+R074,Stockholm,Sweden,984000,188,Europe/Stockholm,1252
 R075,Gothenburg,Sweden,583000,448,Europe/Stockholm,1621
 R076,Oslo,Norway,697000,454,Europe/Oslo,1048
 R077,Copenhagen,Denmark,632000,86,Europe/Copenhagen,1167
@@ -95,4 +95,4 @@ Kowloon
 New Territories
 Lantau",China,7500000,1104,Asia/Hong_Kong,1180
 R091,Singapore,Singapore,5686000,728,Asia/Singapore,1123
-R092,Jakarta,Indonesia,10560000,662,Asia/Jakarta,1300
+R092,Jakarta,Indonesia,10610000,662,Asia/Jakarta,1300
