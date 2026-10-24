@@ -28,19 +28,19 @@
     "browser:firefox": "start \"\" \"C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -no-remote -profile \"%LOCALAPPDATA%\\github-better-csv-diff\\firefox-profile\\firefox_devtools_mcp_profile\""
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@playwright/test": "^1.64.0",
+    "@biomejs/biome": "2.6.2",
+    "@playwright/test": "^1.64.1",
     "@types/papaparse": "^5.5.2",
     "@wxt-dev/auto-icons": "^1.1.2",
     "esbuild": "^0.28.2",
-    "happy-dom": "21.0.3",
+    "happy-dom": "21.0.4",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
-    "vitest": "5.0.3",
+    "vite": "^8.3.5",
+    "vitest": "5.0.5",
     "wxt": "^0.21.4"
   },
   "private": true,
-  "packageManager": "pnpm@12.10.1",
+  "packageManager": "pnpm@12.15.0",
   "dependencies": {
     "diff": "^9.0.0",
     "papaparse": "^5.7.0"
